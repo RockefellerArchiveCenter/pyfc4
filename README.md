@@ -1,2 +1,3 @@
 # pyfc4
-Python binding for Fedora Common 4.x
+
+Python 3.x binding for Fedora Common 4.x
