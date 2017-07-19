@@ -41,6 +41,13 @@ class Repository(object):
 			self.context = {**self.context, **context}
 
 
+	def get_resource(uri):
+
+		'''
+		return appropriate Resource-type instance by reading 
+		'''
+
+
 # Resource
 class Resource(object):
 
