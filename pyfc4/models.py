@@ -8,9 +8,37 @@
 
 
 class Repository(object):
+	
 	'''
+	Class for Fedora Commons 4, LDP server instance
 	'''
-	pass
+
+	# establish context
+	context = {
+		'premis':'http://www.loc.gov/premis/rdf/v1#',
+		'test':'info:fedora/test/',
+		'rdfs':'http://www.w3.org/2000/01/rdf-schema#',
+		'dbpedia':'http://dbpedia.org/ontology/',
+		'xsi':'http://www.w3.org/2001/XMLSchema-instance',
+		'xmlns':'http://www.w3.org/2000/xmlns/',
+		'rdf':'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+		'fedora':'http://fedora.info/definitions/v4/repository#',
+		'xml':'http://www.w3.org/XML/1998/namespace',
+		'ebucore':'http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#',
+		'ldp':'http://www.w3.org/ns/ldp#',
+		'xs':'http://www.w3.org/2001/XMLSchema',
+		'fedoraconfig':'http://fedora.info/definitions/v4/config#',
+		'foaf':'http://xmlns.com/foaf/0.1/',
+		'dc':'http://purl.org/dc/elements/1.1/'
+	}
+
+	def __init__(self, root, username, password, context=None):
+		self.root = root
+		self.username = username
+		self.password = password
+
+		if context:
+			self.context = {**self.context, **context}
 
 
 # Resource
