@@ -1,9 +1,55 @@
 # pyfc4
 
 
+# logging
+import logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
+import requests
 
+
+class Request(object):
+
+	'''
+	Class for issuing HTTP requests to FC4 repository
+	'''
+
+	def __init__(self, repo, headers=None):
+
+		self.repo = repo
+
+
+	def _parse_resource_type(self, response):
+		
+		# split header values for 'Link', splitting on comma and space
+		links = [link.split("ldp#")[1].split(">;")[0] for link in response.headers['Link'].split(', ') if "ldp#" in link]
+		logger.debug(links)
+		
+		# with LDP types in hand, select appropriate pyfc4 class
+		'''
+		A bit of a decision here, need to confirm
+			- that most specific class is selected
+			- can FC4 have multiple, specific classes?
+		'''
+		if 'NonRDFSource' in links:
+			logger.debug('NonRDFSource detected')
+		if 'BasicContainer' in links:
+			logger.debug('BasicContainer detected')
+
+
+	def get(self, uri):
+
+		logger.debug("GET %s" % uri)
+		response = requests.get("%s%s" % (self.repo.root, uri))
+		logger.debug(response.headers)
+
+		# parse LDP resource type from headers
+		resource_type = self._parse_resource_type(response)
+
+		# return appropriate pyfc4 resource type
+		return response
 
 
 
@@ -13,7 +59,7 @@ class Repository(object):
 	Class for Fedora Commons 4, LDP server instance
 	'''
 
-	# establish context
+	# establish namespace context
 	context = {
 		'premis':'http://www.loc.gov/premis/rdf/v1#',
 		'test':'info:fedora/test/',
@@ -32,20 +78,28 @@ class Repository(object):
 		'dc':'http://purl.org/dc/elements/1.1/'
 	}
 
+
 	def __init__(self, root, username, password, context=None):
+
 		self.root = root
+		# ensure trailing slash
+		if not self.root.endswith('/'):
+			self.root += '/'
 		self.username = username
 		self.password = password
 
+		# if context provided, merge with defaults
 		if context:
-			self.context = {**self.context, **context}
+			logger.debug('context provided, merging with defaults')
+			self.context.update(context)
 
 
-	def get_resource(uri):
+	def get_resource(self, uri):
 
 		'''
-		return appropriate Resource-type instance by reading 
+		return appropriate Resource-type instance by reading headers
 		'''
+		return Request(self).get(uri)
 
 
 # Resource
@@ -121,7 +175,7 @@ class IndirectContainer(Container):
 
 
 # NonRDF Source
-class NonRDFResource(Resource):
+class NonRDFSource(Resource):
 
 	'''
 	Linked Data Platform Non-RDF Source (LDP-NR)
