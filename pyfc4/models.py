@@ -64,30 +64,34 @@ class Repository(object):
 	def get_resource(self, uri, response_format=None):
 
 		'''
-		return appropriate Resource-type instance by reading headers
+		return appropriate Resource-type instance
+			- issue HEAD request, sniff out content-type to detect NonRDF
+			- issue GET request 
 		'''
-		# provided response_format
-		response = self.api.http_request('GET', uri, response_format=response_format)
+
+		# HEAD request to detect resource type
+		head_response = self.api.http_request('HEAD', uri)
 
 		# item does not exist, return False
-		if response.status_code == 404:
+		if head_response.status_code == 404:
 			return False
 
 		# assume exists, parse headers for resource type and return instance
 		else:
 
 			# parse LDP resource type from headers
-			resource_type = self.api.parse_resource_type(response)
+			resource_type = self.api.parse_resource_type(head_response)
 			logger.debug('using resource type: %s' % resource_type)
 
-			# parse response pieces to instantiate object
-			'''
-			Do we want to init resource object with binary .content, or text from .text?
-				- likely binary, but will need to parse / deal with later on
+			# RDFSource
+			if resource_type != NonRDFSource:
+				# retrieve RDFSource resource
+				get_response = self.api.http_request('GET', uri, response_format=response_format)
+			# NonRDFSource, retrieve with proper content negotiation
+			else:
+				get_response = self.api.http_request('GET', uri, response_format=head_response.headers['Content-Type'])
 
-			Also, if we include raw_response *and* data, we duplicate size...
-			'''
-			return resource_type(self, uri, data=response.content, headers=response.headers, status_code=response.status_code)
+			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
 
 
 
@@ -126,11 +130,13 @@ class API(object):
 		if not response_format:
 			response_format = self.repo.default_response_format
 
-		# if headers present, append
-		if headers and 'Accept' not in headers.keys():
-			headers['Accept'] = response_format
-		else:
-			headers = {'Accept':response_format}
+		# if not HEAD request
+		if verb != 'HEAD':
+			# if headers present, append
+			if headers and 'Accept' not in headers.keys():
+				headers['Accept'] = response_format
+			else:
+				headers = {'Accept':response_format}
 
 		logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
 
