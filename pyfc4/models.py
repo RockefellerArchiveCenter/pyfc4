@@ -72,7 +72,14 @@ class Repository(object):
 			resource_type = self.api.parse_resource_type(response)
 			logger.debug('using resource type: %s' % resource_type)
 
-			return resource_type(self, uri, response)
+			# parse response pieces to instantiate object
+			'''
+			Do we want to init resource object with binary .content, or text from .text?
+				- likely binary, but will need to parse / deal with later on
+
+			Also, if we include raw_response *and* data, we duplicate size...
+			'''
+			return resource_type(self, uri, data=response.content, headers=response.headers, status_code=response.status_code)
 
 
 
@@ -89,13 +96,25 @@ class API(object):
 		self.repo = repo
 
 
-	########################################################################
-	# HTTP request
-	########################################################################
+	def http_request(self, 
+			verb,
+			uri,
+			data=None,
+			headers=None,
+			response_format='application/ld+json'
+		):
 
-	def http_request(self, verb, uri, data=None, headers=None):
+		'''
+		Acceptable content negotiated response formats include:
+			application/ld+json
+			application/n-triples
+			application/rdf+xml
+			text/n3 (or text/rdf+n3)
+			text/plain
+			text/turtle (or application/x-turtle)
+		'''
 
-		logger.debug("%s request for %s" % (verb, uri))
+		logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
 		
 		# manually prepare request
 		session = requests.Session()
@@ -106,10 +125,6 @@ class API(object):
 		)
 		return response
 
-
-	########################################################################
-	# helper methods
-	########################################################################
 
 	def parse_resource_type(self, response):
 		
@@ -145,13 +160,12 @@ class Resource(object):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, data=None, headers={}, status_code=None, raw_response=None):
+	def __init__(self, repo, data=None, headers={}, status_code=None):
 
 		# resources are combination of data and headers
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
-		self.raw_response = raw_response
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
@@ -207,12 +221,12 @@ class NonRDFSource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, uri, data=None, headers={}, status_code=None, raw_response=None):
+	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
 
 		self.uri = uri
 		
 		# fire parent Container init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 
 # 'Binary' alias for NonRDFSource
@@ -228,10 +242,10 @@ class RDFResource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, data=None, headers={}, status_code=None, raw_response=None):
+	def __init__(self, repo, data=None, headers={}, status_code=None):
 		
 		# fire parent Resource init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 
 
@@ -244,10 +258,10 @@ class Container(RDFResource):
 	https://www.w3.org/TR/ldp/
 	'''
 
-	def __init__(self, repo, data=None, headers={}, status_code=None, raw_response=None):
+	def __init__(self, repo, data=None, headers={}, status_code=None):
 		
 		# fire parent RDFResource init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 
 	def children(self):
@@ -271,16 +285,15 @@ class BasicContainer(Container):
 		- "The important thing to notice is that by posting to a Basic Container, the LDP server automatically adds a triple with ldp:contains predicate pointing to the new resource created."
 	'''
 	
-	def __init__(self, repo, uri, data=None, headers={}, status_code=None, raw_response=None):
+	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
 
 		self.uri = uri
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
-		self.raw_response = raw_response
 		
 		# fire parent Container init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 
 
