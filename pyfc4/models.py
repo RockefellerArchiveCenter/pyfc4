@@ -154,6 +154,10 @@ class Resource(object):
 	
 	def __init__(self, repo, payload):
 
+		# resources are combination of data and headers
+		self.data = None
+		self.headers = {}
+
 		# repository handle is pinned to resource instance here
 		self.repo = repo
 
@@ -176,16 +180,11 @@ class Resource(object):
 			return False
 
 
-	def create(self, data, headers):
+	def create(self):
 
-		'''
-		what to do if data or headers are attached to resource?
-			- might need to sniff out and include in PUT
-		'''
-		
 		# if resource does not, create
 		if not self.exists():
-			self.repo.api.put(self.uri, data, headers)
+			self.repo.api.put(self.uri, self.data, self.headers)
 		else:
 			logger.debug('resource %s exists, aborting create' % self.uri)
 
@@ -216,8 +215,6 @@ class NonRDFSource(Resource):
 	def __init__(self, repo, uri, payload=None):
 
 		self.uri = uri
-		self.content = None
-		self.mimetype = None
 		
 		# fire parent Container init()
 		super().__init__(repo, payload)
