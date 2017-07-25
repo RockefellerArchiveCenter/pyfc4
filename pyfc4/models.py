@@ -36,7 +36,13 @@ class Repository(object):
 	}
 
 
-	def __init__(self, root, username, password, context=None):
+	def __init__(self, 
+			root,
+			username,
+			password,
+			context=None,
+			default_response_format='application/ld+json'
+		):
 
 		self.root = root
 		# ensure trailing slash
@@ -44,6 +50,7 @@ class Repository(object):
 			self.root += '/'
 		self.username = username
 		self.password = password
+		self.default_response_format = default_response_format
 
 		# API facade
 		self.api = API(self)
@@ -54,12 +61,13 @@ class Repository(object):
 			self.context.update(context)
 
 
-	def get_resource(self, uri):
+	def get_resource(self, uri, response_format=None):
 
 		'''
 		return appropriate Resource-type instance by reading headers
 		'''
-		response = self.api.http_request('GET', uri)
+		# provided response_format
+		response = self.api.http_request('GET', uri, response_format=response_format)
 
 		# item does not exist, return False
 		if response.status_code == 404:
@@ -101,9 +109,10 @@ class API(object):
 			uri,
 			data=None,
 			headers=None,
-			response_format='application/ld+json'
+			response_format=None
 		):
 
+		# set content negotiated response format
 		'''
 		Acceptable content negotiated response formats include:
 			application/ld+json
@@ -113,9 +122,18 @@ class API(object):
 			text/plain
 			text/turtle (or application/x-turtle)
 		'''
+		# if no response_format has been requested to this point, use repository instance default
+		if not response_format:
+			response_format = self.repo.default_response_format
+
+		# if headers present, append
+		if headers and 'Accept' not in headers.keys():
+			headers['Accept'] = response_format
+		else:
+			headers = {'Accept':response_format}
 
 		logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
-		
+
 		# manually prepare request
 		session = requests.Session()
 		request = requests.Request(verb, "%s%s" % (self.repo.root, uri), data=data, headers=headers)
