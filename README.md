@@ -8,6 +8,12 @@ Python 3.x binding for Fedora Commons 4.x
 
 ## ToDo
 
+### Resource instantiation
+
+  * passing `data`, `headers` when instantiating
+    * that way, can instantiate from multiple angles (raw class or request response)
+  * should include a placeholder for raw response as well, something like `raw_response`
+
 ### Structures
 
   * Indirect and Direct Containers (basic is quasi-understood and implemented)

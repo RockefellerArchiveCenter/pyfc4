@@ -171,19 +171,16 @@ class Resource(object):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, payload):
+	def __init__(self, repo, data=None, headers={}, status_code=None, raw_response=None):
 
 		# resources are combination of data and headers
-		self.data = None
-		self.headers = {}
+		self.data = data
+		self.headers = headers
+		self.status_code = status_code
+		self.raw_response = raw_response
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
-
-		# if payload attached, assume resource exists and populate
-		if payload:
-			logger.debug('resource payload provided')
-			self.body = payload.text
 
 
 	def exists(self):
@@ -227,7 +224,6 @@ class Resource(object):
 
 
 
-
 # NonRDF Source
 class NonRDFSource(Resource):
 
@@ -237,12 +233,12 @@ class NonRDFSource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, uri, payload=None):
+	def __init__(self, repo, uri, data=None, headers={}, status_code=None, raw_response=None):
 
 		self.uri = uri
 		
 		# fire parent Container init()
-		super().__init__(repo, payload)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
 
 
 # 'Binary' alias for NonRDFSource
@@ -258,10 +254,10 @@ class RDFResource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, payload):
+	def __init__(self, repo, data=None, headers={}, status_code=None, raw_response=None):
 		
 		# fire parent Resource init()
-		super().__init__(repo, payload)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
 
 
 
@@ -274,10 +270,10 @@ class Container(RDFResource):
 	https://www.w3.org/TR/ldp/
 	'''
 
-	def __init__(self, repo, payload):
+	def __init__(self, repo, data=None, headers={}, status_code=None, raw_response=None):
 		
 		# fire parent RDFResource init()
-		super().__init__(repo, payload)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
 
 
 	def children(self):
@@ -285,6 +281,7 @@ class Container(RDFResource):
 		'''
 		method to return children of this resource
 		'''
+		pass
 
 
 
@@ -300,12 +297,16 @@ class BasicContainer(Container):
 		- "The important thing to notice is that by posting to a Basic Container, the LDP server automatically adds a triple with ldp:contains predicate pointing to the new resource created."
 	'''
 	
-	def __init__(self, repo, uri, payload=None):
+	def __init__(self, repo, uri, data=None, headers={}, status_code=None, raw_response=None):
 
 		self.uri = uri
+		self.data = data
+		self.headers = headers
+		self.status_code = status_code
+		self.raw_response = raw_response
 		
 		# fire parent Container init()
-		super().__init__(repo, payload)
+		super().__init__(repo, data=data, headers=headers, status_code=status_code, raw_response=raw_response)
 
 
 
