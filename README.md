@@ -22,12 +22,12 @@ Python 3.x binding for Fedora Commons 4.x
 
 Helpful: [RESTful HTTP API - Containers](https://wiki.duraspace.org/display/FEDORA40/RESTful+HTTP+API+-+Containers)
 
-  * GET  Retrieve the content of the resource
-  * POST Create new resources within a LDP container
-  * PATCH  Modify the triples associated with a resource with SPARQL-Update
-  * OPTIONS Outputs information about the supported HTTP methods, etc.
-  * MOVE  Move a resource (and its subtree) to a new location
-  * COPY Copy a resource (and its subtree) to a new location
+  * `GET`  Retrieve the content of the resource
+  * `POST` Create new resources within a LDP container
+  * `PATCH`  Modify the triples associated with a resource with SPARQL-Update
+  * `OPTIONS` Outputs information about the supported HTTP methods, etc.
+  * `MOVE`  Move a resource (and its subtree) to a new location
+  * `COPY` Copy a resource (and its subtree) to a new location
 
 ### Performance
 
