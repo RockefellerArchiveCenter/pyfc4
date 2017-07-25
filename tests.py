@@ -56,11 +56,24 @@ def delete_test_resources():
 
 # run all tests
 def run_all_tests(cleanup=False):
-	create_bc()
-	get_bc()
-	create_child_bc()
-	get_child_bc()
-	create_child_binary()
-	get_child_binary()
+	
+	tests = [	
+		create_bc(),
+		get_bc(),
+		create_child_bc(),
+		get_child_bc(),
+		create_child_binary(),
+		get_child_binary()
+	]
+
 	if cleanup:
 		delete_test_resources()
+
+	if False in tests:
+		logger.debug('\n\nTESTS RESULT: not all tests passed\n\n')
+	else:
+		logger.debug('\n\nTESTS RESULT: all systems go!\n\n')
+
+
+if __name__ == '__main__':
+	run_all_tests(cleanup=True)
