@@ -5,11 +5,30 @@ from pyfc4.models import *
 # instantiate repository
 repo = Repository('http://localhost:8080/rest','ghukill','password', context={'foo':'http://foo.com'})
 
+# create foo (basic container)
+def create_bc():
+	pass
+
 # get foo
-foo = repo.get_resource('foo')
+def get_bc():
+	pass
 
-# create basic container
+# create foo/bar (basic container)
+def create_child_bc():
+	pass
 
-# create NonRDF node
+# get foo/bar from foo.children()
+def get_child_bc():
+	pass
 
-# delete both
+# create foo/baz (NonRDF / binary), from foo
+def create_child_binary():
+	pass
+
+# get foo/baz
+def get_child_binary():
+	pass
+
+# delete all three
+def delete_test_resources():
+	pass

@@ -9,53 +9,7 @@ logger = logging.getLogger(__name__)
 
 import requests
 
-
-class API(object):
-
-	'''
-	API for making requests and parsing responses from FC4 endpoint
-	'''
-
-	def __init__(self, repo):
-
-		# repository instance
-		self.repo = repo
-
-
-	def _parse_resource_type(self, response):
-		
-		# parse 'Link' header
-		links = [link.split(";")[0] for link in response.headers['Link'].split(', ') if link.startswith('<http://www.w3.org/ns/ldp#')]
-		logger.debug('parsed Link headers: %s' % links)
-		
-		# with LDP types in hand, select appropriate resource type
-		# NonRDF Source
-		if '<http://www.w3.org/ns/ldp#NonRDFSource>' in links:
-			return NonRDFSource
-		# Basic Container
-		elif '<http://www.w3.org/ns/ldp#BasicContainer>' in links:
-			return BasicContainer
-		# Direct Container
-		elif '<http://www.w3.org/ns/ldp#DirectContainer>' in links:
-			return DirectContainer
-		# Indirect Container
-		elif '<http://www.w3.org/ns/ldp#IndirectContainer>' in links:
-			return IndirectContainer
-		else:
-			logger.debug('could not determine resource type from Link header, returning False')
-			return False
-
-
-	# GET requests
-	def get(self, uri, headers=None):
-
-		logger.debug("GET %s" % uri)
-		response = requests.get("%s%s" % (self.repo.root, uri), headers=headers)
-
-		# return response
-		return response
-
-
+# Repository
 class Repository(object):
 	
 	'''
@@ -117,7 +71,76 @@ class Repository(object):
 			resource_type = self.api._parse_resource_type(response)
 			logger.debug('using resource type: %s' % resource_type)
 
-			return resource_type(self, response)
+			return resource_type(self, uri, response)
+
+
+
+# API
+class API(object):
+
+	'''
+	API for making requests and parsing responses from FC4 endpoint
+	'''
+
+	def __init__(self, repo):
+
+		# repository instance
+		self.repo = repo
+
+
+	def _parse_resource_type(self, response):
+		
+		# parse 'Link' header
+		links = [link.split(";")[0] for link in response.headers['Link'].split(', ') if link.startswith('<http://www.w3.org/ns/ldp#')]
+		logger.debug('parsed Link headers: %s' % links)
+		
+		# with LDP types in hand, select appropriate resource type
+		# NonRDF Source
+		if '<http://www.w3.org/ns/ldp#NonRDFSource>' in links:
+			return NonRDFSource
+		# Basic Container
+		elif '<http://www.w3.org/ns/ldp#BasicContainer>' in links:
+			return BasicContainer
+		# Direct Container
+		elif '<http://www.w3.org/ns/ldp#DirectContainer>' in links:
+			return DirectContainer
+		# Indirect Container
+		elif '<http://www.w3.org/ns/ldp#IndirectContainer>' in links:
+			return IndirectContainer
+		else:
+			logger.debug('could not determine resource type from Link header, returning False')
+			return False
+
+
+	# GET requests
+	def get(self, uri, headers=None):
+
+		logger.debug("GET %s" % uri)
+		response = requests.get("%s%s" % (self.repo.root, uri), headers=headers)
+
+		# return response
+		return response
+
+
+	# PUT requests
+	def put(self, uri, data=None, headers=None):
+
+		logger.debug("PUT %s" % uri)
+		response = requests.put("%s%s" % (self.repo.root, uri), data=data, headers=headers)
+
+		# return response
+		return response
+
+
+	# DELETE requests
+	def delete(self, uri, data=None, headers=None):
+
+		logger.debug("DELETE %s" % uri)
+		response = requests.delete("%s%s" % (self.repo.root, uri), data=data, headers=headers)
+
+		# return response
+		return response
+
 
 
 # Resource
@@ -138,6 +161,41 @@ class Resource(object):
 		if payload:
 			logger.debug('resource payload provided')
 			self.body = payload.text
+
+
+	def exists(self):
+		
+		'''
+		Check if resource exists, returns bool
+		'''
+
+		response = self.repo.api.get(self.uri)
+		if response.status_code == 200:
+			return True
+		if response.status_code == 404:
+			return False
+
+
+	def create(self):
+		
+		# if resource does not, create
+		if not self.exists():
+			self.repo.api.put(self.uri)
+
+
+
+	def delete(self, remove_tombstone=True):
+
+		'''
+		account for tombstone
+		'''
+
+		self.repo.api.delete(self.uri)
+
+		if remove_tombstone:
+			self.repo.api.delete("%s/fcr:tombstone" % self.uri)
+
+
 
 
 # NonRDF Source
@@ -195,7 +253,9 @@ class BasicContainer(Container):
 		- "The important thing to notice is that by posting to a Basic Container, the LDP server automatically adds a triple with ldp:contains predicate pointing to the new resource created."
 	'''
 	
-	def __init__(self, repo, payload=None):
+	def __init__(self, repo, uri, payload=None):
+
+		self.uri = uri
 		
 		# fire parent Container init()
 		super().__init__(repo, payload)
