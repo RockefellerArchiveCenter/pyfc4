@@ -67,8 +67,9 @@ class Repository(object):
 
 		# assume exists, parse headers for resource type and return instance
 		else:
+
 			# parse LDP resource type from headers
-			resource_type = self.api._parse_resource_type(response)
+			resource_type = self.api.parse_resource_type(response)
 			logger.debug('using resource type: %s' % resource_type)
 
 			return resource_type(self, uri, response)
@@ -88,28 +89,18 @@ class API(object):
 		self.repo = repo
 
 
-	def _parse_resource_type(self, response):
-		
-		# parse 'Link' header
-		links = [link.split(";")[0] for link in response.headers['Link'].split(', ') if link.startswith('<http://www.w3.org/ns/ldp#')]
-		logger.debug('parsed Link headers: %s' % links)
-		
-		# with LDP types in hand, select appropriate resource type
-		# NonRDF Source
-		if '<http://www.w3.org/ns/ldp#NonRDFSource>' in links:
-			return NonRDFSource
-		# Basic Container
-		elif '<http://www.w3.org/ns/ldp#BasicContainer>' in links:
-			return BasicContainer
-		# Direct Container
-		elif '<http://www.w3.org/ns/ldp#DirectContainer>' in links:
-			return DirectContainer
-		# Indirect Container
-		elif '<http://www.w3.org/ns/ldp#IndirectContainer>' in links:
-			return IndirectContainer
-		else:
-			logger.debug('could not determine resource type from Link header, returning False')
-			return False
+	########################################################################
+	# HTTP Verbs
+	########################################################################
+
+	# HEAD requests
+	def head(self, uri, headers=None):
+
+		logger.debug("HEAD %s" % uri)
+		response = requests.head("%s%s" % (self.repo.root, uri), headers=headers)
+
+		# return response
+		return response
 
 
 	# GET requests
@@ -140,6 +131,34 @@ class API(object):
 
 		# return response
 		return response
+
+
+	########################################################################
+	# helper methods
+	########################################################################
+
+	def parse_resource_type(self, response):
+		
+		# parse 'Link' header
+		links = [link.split(";")[0] for link in response.headers['Link'].split(', ') if link.startswith('<http://www.w3.org/ns/ldp#')]
+		logger.debug('parsed Link headers: %s' % links)
+		
+		# with LDP types in hand, select appropriate resource type
+		# NonRDF Source
+		if '<http://www.w3.org/ns/ldp#NonRDFSource>' in links:
+			return NonRDFSource
+		# Basic Container
+		elif '<http://www.w3.org/ns/ldp#BasicContainer>' in links:
+			return BasicContainer
+		# Direct Container
+		elif '<http://www.w3.org/ns/ldp#DirectContainer>' in links:
+			return DirectContainer
+		# Indirect Container
+		elif '<http://www.w3.org/ns/ldp#IndirectContainer>' in links:
+			return IndirectContainer
+		else:
+			logger.debug('could not determine resource type from Link header, returning False')
+			return False
 
 
 
@@ -173,7 +192,7 @@ class Resource(object):
 		Check if resource exists, returns bool
 		'''
 
-		response = self.repo.api.get(self.uri)
+		response = self.repo.api.head(self.uri)
 		if response.status_code == 200:
 			return True
 		if response.status_code == 404:
@@ -181,6 +200,12 @@ class Resource(object):
 
 
 	def create(self):
+
+		'''
+		when object is created, self.data and self.headers are passed with the requests
+			- when creating NonRDFSource (Binary) type resources, this resource must include 
+			content for self.data and a header value for self.headers['Content-Type']
+		'''
 
 		# if resource does not, create
 		if not self.exists():
@@ -253,6 +278,13 @@ class Container(RDFResource):
 		
 		# fire parent RDFResource init()
 		super().__init__(repo, payload)
+
+
+	def children(self):
+
+		'''
+		method to return children of this resource
+		'''
 
 
 
