@@ -176,12 +176,18 @@ class Resource(object):
 			return False
 
 
-	def create(self):
+	def create(self, data, headers):
+
+		'''
+		what to do if data or headers are attached to resource?
+			- might need to sniff out and include in PUT
+		'''
 		
 		# if resource does not, create
 		if not self.exists():
-			self.repo.api.put(self.uri)
-
+			self.repo.api.put(self.uri, data, headers)
+		else:
+			logger.debug('resource %s exists, aborting create' % self.uri)
 
 
 	def delete(self, remove_tombstone=True):
@@ -206,7 +212,19 @@ class NonRDFSource(Resource):
 	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
 	https://www.w3.org/TR/ldp/
 	'''
-	pass
+	
+	def __init__(self, repo, uri, payload=None):
+
+		self.uri = uri
+		self.content = None
+		self.mimetype = None
+		
+		# fire parent Container init()
+		super().__init__(repo, payload)
+
+
+# 'Binary' alias for NonRDFSource
+Binary = NonRDFSource
 
 
 # RDF Source
@@ -224,6 +242,7 @@ class RDFResource(Resource):
 		super().__init__(repo, payload)
 
 
+
 # Container
 class Container(RDFResource):
 	
@@ -237,7 +256,6 @@ class Container(RDFResource):
 		
 		# fire parent RDFResource init()
 		super().__init__(repo, payload)
-	
 
 
 
@@ -261,6 +279,7 @@ class BasicContainer(Container):
 		super().__init__(repo, payload)
 
 
+
 # Direct Container
 class DirectContainer(Container):
 	
@@ -273,6 +292,7 @@ class DirectContainer(Container):
 
 	'''
 	pass
+
 
 
 # Indirect Container
