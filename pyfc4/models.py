@@ -10,47 +10,50 @@ logger = logging.getLogger(__name__)
 import requests
 
 
-class Request(object):
+class API(object):
 
 	'''
-	Class for issuing HTTP requests to FC4 repository
+	API for making requests and parsing responses from FC4 endpoint
 	'''
 
-	def __init__(self, repo, headers=None):
+	def __init__(self, repo):
 
+		# repository instance
 		self.repo = repo
 
 
 	def _parse_resource_type(self, response):
 		
-		# split header values for 'Link', splitting on comma and space
-		links = [link.split("ldp#")[1].split(">;")[0] for link in response.headers['Link'].split(', ') if "ldp#" in link]
-		logger.debug(links)
+		# parse 'Link' header
+		links = [link.split(";")[0] for link in response.headers['Link'].split(', ') if link.startswith('<http://www.w3.org/ns/ldp#')]
+		logger.debug('parsed Link headers: %s' % links)
 		
-		# with LDP types in hand, select appropriate pyfc4 class
-		'''
-		A bit of a decision here, need to confirm
-			- that most specific class is selected
-			- can FC4 have multiple, specific classes?
-		'''
-		if 'NonRDFSource' in links:
-			logger.debug('NonRDFSource detected')
-		if 'BasicContainer' in links:
-			logger.debug('BasicContainer detected')
+		# with LDP types in hand, select appropriate resource type
+		# NonRDF Source
+		if '<http://www.w3.org/ns/ldp#NonRDFSource>' in links:
+			return NonRDFSource
+		# Basic Container
+		elif '<http://www.w3.org/ns/ldp#BasicContainer>' in links:
+			return BasicContainer
+		# Direct Container
+		elif '<http://www.w3.org/ns/ldp#DirectContainer>' in links:
+			return DirectContainer
+		# Indirect Container
+		elif '<http://www.w3.org/ns/ldp#IndirectContainer>' in links:
+			return IndirectContainer
+		else:
+			logger.debug('could not determine resource type from Link header, returning False')
+			return False
 
 
-	def get(self, uri):
+	# GET requests
+	def get(self, uri, headers=None):
 
 		logger.debug("GET %s" % uri)
-		response = requests.get("%s%s" % (self.repo.root, uri))
-		logger.debug(response.headers)
+		response = requests.get("%s%s" % (self.repo.root, uri), headers=headers)
 
-		# parse LDP resource type from headers
-		resource_type = self._parse_resource_type(response)
-
-		# return appropriate pyfc4 resource type
+		# return response
 		return response
-
 
 
 class Repository(object):
@@ -88,6 +91,9 @@ class Repository(object):
 		self.username = username
 		self.password = password
 
+		# API facade
+		self.api = API(self)
+
 		# if context provided, merge with defaults
 		if context:
 			logger.debug('context provided, merging with defaults')
@@ -99,7 +105,19 @@ class Repository(object):
 		'''
 		return appropriate Resource-type instance by reading headers
 		'''
-		return Request(self).get(uri)
+		response = self.api.get(uri)
+
+		# item does not exist, return False
+		if response.status_code == 404:
+			return False
+
+		# assume exists, parse headers for resource type and return instance
+		else:
+			# parse LDP resource type from headers
+			resource_type = self.api._parse_resource_type(response)
+			logger.debug('using resource type: %s' % resource_type)
+
+			return resource_type(self, response)
 
 
 # Resource
@@ -108,6 +126,26 @@ class Resource(object):
 	'''
 	Linked Data Platform Resource (LDPR)
 	A HTTP resource whose state is represented in any way that conforms to the simple lifecycle patterns and conventions in section 4. Linked Data Platform Resources.
+	https://www.w3.org/TR/ldp/
+	'''
+	
+	def __init__(self, repo, payload):
+
+		# repository handle is pinned to resource instance here
+		self.repo = repo
+
+		# if payload attached, assume resource exists and populate
+		if payload:
+			logger.debug('resource payload provided')
+			self.body = payload.text
+
+
+# NonRDF Source
+class NonRDFSource(Resource):
+
+	'''
+	Linked Data Platform Non-RDF Source (LDP-NR)
+	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
 	https://www.w3.org/TR/ldp/
 	'''
 	pass
@@ -121,7 +159,11 @@ class RDFResource(Resource):
 	An LDPR whose state is fully represented in RDF, corresponding to an RDF graph. See also the term RDF Source from [rdf11-concepts].
 	https://www.w3.org/TR/ldp/
 	'''
-	pass
+	
+	def __init__(self, repo, payload):
+		
+		# fire parent Resource init()
+		super().__init__(repo, payload)
 
 
 # Container
@@ -132,7 +174,13 @@ class Container(RDFResource):
 	A LDP-RS representing a collection of linked documents (RDF Document [rdf11-concepts] or information resources [WEBARCH]) that responds to client requests for creation, modification, and/or enumeration of its linked members and documents, and that conforms to the simple lifecycle patterns and conventions in section 5. Linked Data Platform Containers.
 	https://www.w3.org/TR/ldp/
 	'''
-	pass
+
+	def __init__(self, repo, payload):
+		
+		# fire parent RDFResource init()
+		super().__init__(repo, payload)
+	
+
 
 
 # Basic Container
@@ -146,7 +194,11 @@ class BasicContainer(Container):
 	https://gist.github.com/hectorcorrea/dc20d743583488168703
 		- "The important thing to notice is that by posting to a Basic Container, the LDP server automatically adds a triple with ldp:contains predicate pointing to the new resource created."
 	'''
-	pass
+	
+	def __init__(self, repo, payload=None):
+		
+		# fire parent Container init()
+		super().__init__(repo, payload)
 
 
 # Direct Container
@@ -174,12 +226,3 @@ class IndirectContainer(Container):
 	pass
 
 
-# NonRDF Source
-class NonRDFSource(Resource):
-
-	'''
-	Linked Data Platform Non-RDF Source (LDP-NR)
-	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
-	https://www.w3.org/TR/ldp/
-	'''
-	pass
