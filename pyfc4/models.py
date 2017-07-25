@@ -59,7 +59,7 @@ class Repository(object):
 		'''
 		return appropriate Resource-type instance by reading headers
 		'''
-		response = self.api.get(uri)
+		response = self.api.http_request('GET', uri)
 
 		# item does not exist, return False
 		if response.status_code == 404:
@@ -90,46 +90,20 @@ class API(object):
 
 
 	########################################################################
-	# HTTP Verbs
+	# HTTP request
 	########################################################################
 
-	# HEAD requests
-	def head(self, uri, headers=None):
+	def http_request(self, verb, uri, data=None, headers=None):
 
-		logger.debug("HEAD %s" % uri)
-		response = requests.head("%s%s" % (self.repo.root, uri), headers=headers)
-
-		# return response
-		return response
-
-
-	# GET requests
-	def get(self, uri, headers=None):
-
-		logger.debug("GET %s" % uri)
-		response = requests.get("%s%s" % (self.repo.root, uri), headers=headers)
-
-		# return response
-		return response
-
-
-	# PUT requests
-	def put(self, uri, data=None, headers=None):
-
-		logger.debug("PUT %s" % uri)
-		response = requests.put("%s%s" % (self.repo.root, uri), data=data, headers=headers)
-
-		# return response
-		return response
-
-
-	# DELETE requests
-	def delete(self, uri, data=None, headers=None):
-
-		logger.debug("DELETE %s" % uri)
-		response = requests.delete("%s%s" % (self.repo.root, uri), data=data, headers=headers)
-
-		# return response
+		logger.debug("%s request for %s" % (verb, uri))
+		
+		# manually prepare request
+		session = requests.Session()
+		request = requests.Request(verb, "%s%s" % (self.repo.root, uri), data=data, headers=headers)
+		prepped_request = session.prepare_request(request)
+		response = session.send(prepped_request,
+			stream=False,
+		)
 		return response
 
 
@@ -189,7 +163,7 @@ class Resource(object):
 		Check if resource exists, returns bool
 		'''
 
-		response = self.repo.api.head(self.uri)
+		response = self.repo.api.http_request('HEAD', self.uri)
 		if response.status_code == 200:
 			return True
 		if response.status_code == 404:
@@ -206,7 +180,7 @@ class Resource(object):
 
 		# if resource does not, create
 		if not self.exists():
-			self.repo.api.put(self.uri, self.data, self.headers)
+			self.repo.api.http_request('PUT', self.uri, self.data, self.headers)
 		else:
 			logger.debug('resource %s exists, aborting create' % self.uri)
 
@@ -217,10 +191,10 @@ class Resource(object):
 		account for tombstone
 		'''
 
-		self.repo.api.delete(self.uri)
+		self.repo.api.http_request('DELETE', self.uri)
 
 		if remove_tombstone:
-			self.repo.api.delete("%s/fcr:tombstone" % self.uri)
+			self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
 
 
 
