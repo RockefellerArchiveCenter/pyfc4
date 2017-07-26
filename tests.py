@@ -7,6 +7,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
 # instantiate repository
 repo = Repository('http://localhost:8080/rest','ghukill','password', context={'foo':'http://foo.com'})
 
@@ -14,12 +15,12 @@ repo = Repository('http://localhost:8080/rest','ghukill','password', context={'f
 def create_bc():
 	foo = BasicContainer(repo, 'foo')
 	foo.create()
-	return foo.exists()
+	return foo.exists
 
 # get foo via repo.get_resource()
 def get_bc():
 	foo = repo.get_resource('foo')
-	return foo.exists()
+	return foo.exists
 
 # test RDF parsing of different Content-Types
 def test_graph_parse():
@@ -40,12 +41,12 @@ def test_graph_parse():
 def create_child_bc():
 	bar = BasicContainer(repo, 'foo/bar')
 	bar.create()
-	return bar.exists()
+	return bar.exists
 
 # get foo/bar from foo.children()
 def get_child_bc():
 	bar = repo.get_resource('foo/bar')
-	return bar.exists()
+	return bar.exists
 
 # create foo/baz (NonRDF / binary), from foo
 def create_child_binary():
@@ -53,12 +54,12 @@ def create_child_binary():
 	baz.data = 'this is a test, this is only a test'
 	baz.headers['Content-Type'] = 'text/plain'
 	baz.create()
-	return baz.exists()
+	return baz.exists
 
 # get foo/baz
 def get_child_binary():
 	baz = repo.get_resource('foo/baz')
-	return baz.exists()
+	return baz.exists
 
 # delete all three
 def delete_test_resources():
@@ -71,6 +72,10 @@ def delete_test_resources():
 
 # run all tests
 def run_all_tests(cleanup=False):
+
+	# clean start
+	if cleanup:
+		delete_test_resources()
 	
 	tests = [	
 		create_bc(),
@@ -82,11 +87,13 @@ def run_all_tests(cleanup=False):
 		get_child_binary()
 	]
 
+	# cleanup
 	if cleanup:
 		delete_test_resources()
 
 	if False in tests:
 		logger.debug('\n\nTESTS RESULT: not all tests passed\n\n')
+		logger.debug(tests)
 	else:
 		logger.debug('\n\nTESTS RESULT: all systems go!\n\n')
 

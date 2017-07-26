@@ -10,8 +10,8 @@ import requests
 
 # logging
 import logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 
@@ -133,18 +133,18 @@ class API(object):
 			text/turtle (or application/x-turtle)
 		'''
 		# if no response_format has been requested to this point, use repository instance default
-		if not response_format:
-			response_format = self.repo.default_response_format
+		# if not response_format:
+		# 	response_format = self.repo.default_response_format
 
-		# if not HEAD request
-		if verb != 'HEAD':
-			# if headers present, append
-			if headers and 'Accept' not in headers.keys():
-				headers['Accept'] = response_format
-			else:
-				headers = {'Accept':response_format}
+		# # if not HEAD request
+		# if verb != 'HEAD':
+		# 	# if headers present, append
+		# 	if headers and 'Accept' not in headers.keys():
+		# 		headers['Accept'] = response_format
+		# 	else:
+		# 		headers = {'Accept':response_format}
 
-		logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
+		# logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
 
 		# manually prepare request
 		session = requests.Session()
@@ -201,17 +201,18 @@ class Resource(object):
 		self.repo = repo
 
 
-	def exists(self):
+	def check_exists(self):
 		
 		'''
-		Check if resource exists, returns bool
+		Check if resource exists, update self.exists, returns
 		'''
 
 		response = self.repo.api.http_request('HEAD', self.uri)
 		if response.status_code == 200:
-			return True
+			self.exists = True
 		if response.status_code == 404:
-			return False
+			self.exists = False
+		return self.exists
 
 
 	def create(self):
@@ -223,8 +224,10 @@ class Resource(object):
 		'''
 
 		# if resource does not, create
-		if not self.exists():
-			self.repo.api.http_request('PUT', self.uri, self.data, self.headers)
+		if not self.exists:
+			response = self.repo.api.http_request('PUT', self.uri, self.data, self.headers)
+			if response.status_code == 201:
+				self.exists = True
 		else:
 			logger.debug('resource %s exists, aborting create' % self.uri)
 
@@ -254,6 +257,14 @@ class NonRDFSource(Resource):
 	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
 
 		self.uri = uri
+		self.data = data
+		self.headers = headers
+		self.status_code = status_code
+		# if status_code provided, and 200, set exists attribute as True
+		if self.status_code == 200:
+			self.exists = True
+		else:
+			self.exists = False
 		
 		# fire parent Container init()
 		super().__init__(repo, data=data, headers=headers, status_code=status_code)
@@ -278,7 +289,8 @@ class RDFResource(Resource):
 		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 		# parse RDF
-		self.graph = self.parse_graph()
+		if self.exists:
+			self.graph = self.parse_graph()
 
 
 	def parse_graph(self):
@@ -294,8 +306,7 @@ class RDFResource(Resource):
 		else:
 			parse_format = self.headers['Content-Type']
 
-		# clean parse format for rdf parser
-		# https://www.w3.org/2008/01/rdf-media-types
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
 		if ';charset' in parse_format:
 			parse_format = parse_format.split(';')[0]
 		
@@ -346,6 +357,11 @@ class BasicContainer(Container):
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
+		# if status_code provided, and 200, set exists attribute as True
+		if self.status_code == 200:
+			self.exists = True
+		else:
+			self.exists = False
 		
 		# fire parent Container init()
 		super().__init__(repo, data=data, headers=headers, status_code=status_code)
