@@ -12,7 +12,6 @@ logger.setLevel(logging.DEBUG)
 
 
 
-
 # Repository
 class Repository(object):
 	
