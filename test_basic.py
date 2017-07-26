@@ -5,6 +5,7 @@ import rdflib
 
 # logging
 import logging
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -19,13 +20,13 @@ repo = Repository('http://localhost:8080/rest','ghukill','password', context={'f
 ########################################################
 @pytest.fixture()
 def before():
-	print('removing test objects pre-tests')
+	logger.debug('\n\n## tests setup... ##\n')
 	for uri in ['foo','foo/bar','foo/baz']:
 		try:
 			resource = repo.get_resource(uri)
 			resource.delete(remove_tombstone=True)
 		except:
-			print('could not delete %s' % uri)
+			logger.debug('could not delete %s' % uri)
 
 
 ########################################################

@@ -1,17 +1,15 @@
 # pyfc4
 
-# rdf
+import json
 from rdflib import Graph, plugin
-# from SPARQLWrapper import SPARQLWrapper
-import json, rdflib_jsonld
-
-
+import rdflib_jsonld
 import requests
 
 # logging
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 
 
 
@@ -132,17 +130,17 @@ class API(object):
 			text/plain
 			text/turtle (or application/x-turtle)
 		'''
-		# if no response_format has been requested to this point, use repository instance default
-		# if not response_format:
-		# 	response_format = self.repo.default_response_format
-
-		# # if not HEAD request
-		# if verb != 'HEAD':
-		# 	# if headers present, append
-		# 	if headers and 'Accept' not in headers.keys():
-		# 		headers['Accept'] = response_format
-		# 	else:
-		# 		headers = {'Accept':response_format}
+		# set for GET requests only for now
+		if verb == 'GET':
+			# if no response_format has been requested to this point, use repository instance default
+			if not response_format:
+				response_format = self.repo.default_response_format
+			# if headers present, append
+			if headers and 'Accept' not in headers.keys():
+				headers['Accept'] = response_format
+			# if headers are blank, init dictionary
+			else:
+				headers = {'Accept':response_format}
 
 		logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
 
