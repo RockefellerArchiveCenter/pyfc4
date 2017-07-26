@@ -213,23 +213,58 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, ignore_tombstone=False):
+	def create(self, specify_uri=False, ignore_tombstone=False):
 
 		'''
 		when object is created, self.data and self.headers are passed with the requests
 			- when creating NonRDFSource (Binary) type resources, this resource must include 
 			content for self.data and a header value for self.headers['Content-Type']
+
+		URIs and PUT/POST
+			- if uri is present, assume desired uri and use PUT.
+			- if uri absent, assumed repo assigned uri, use POST
 		'''
 
-		# if resource does not, create
-		if not self.exists:
-			response = self.repo.api.http_request('PUT', self.uri, self.data, self.headers)
-			# 201, success
+		# if resource exists, raise exception
+		if self.exists:
+			raise Exception('resource exists attribute True, aborting')
+
+		# else, continue
+		else:
+
+			# determine verb based on specify_uri parameter
+			if specify_uri:
+				verb = 'PUT'
+			else:
+				verb = 'POST'
+			logger.debug('creating resource with %s verb' % verb)
+
+			# fire request
+			response = self.repo.api.http_request(verb, self.uri, self.data, self.headers)
+			
+			# 201, success, refresh
 			if response.status_code == 201:
+				'''
+				If POST, need to capture new uri from response
+					- or during refresh?
+				'''
+
+				# if not specifying uri, capture from response and append to object
+				self.uri = response.text.split(self.repo.root)[1]
+
 				# creation successful, update resource
 				self.refresh()
+
+			# 404, assumed POST, target location does not exist
+			elif response.status_code == 404:
+				raise Exception('for this POST request, target location does not exist')
+
+			# 409, conflict, resource likely exists
+			elif response.status_code == 409:
+				raise Exception('status 409 received, resource already exists')
+			
 			# 410, tombstone present
-			if response.status_code == 410:
+			elif response.status_code == 410:
 				logger.debug('tombstone for %s detected, aborting' % self.uri)
 				if ignore_tombstone:
 					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
@@ -238,8 +273,11 @@ class Resource(object):
 						self.create()
 					else:
 						raise Exception('Could not remove tombstone for %s' % self.uri)
-		else:
-			logger.debug('resource %s exists, aborting create' % self.uri)
+
+			# unknown status code
+			else:
+				raise Exception('unknown error creating, status code: %s' % response.status_code)
+
 
 
 	def delete(self, remove_tombstone=True):
@@ -403,7 +441,7 @@ class BasicContainer(Container):
 		- "The important thing to notice is that by posting to a Basic Container, the LDP server automatically adds a triple with ldp:contains predicate pointing to the new resource created."
 	'''
 	
-	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
 		self.uri = uri
 		self.data = data
