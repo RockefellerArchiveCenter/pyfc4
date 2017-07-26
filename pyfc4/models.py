@@ -1,5 +1,12 @@
 # pyfc4
 
+# rdf
+from rdflib import Graph, plugin
+# from SPARQLWrapper import SPARQLWrapper
+import json, rdflib_jsonld
+
+
+import requests
 
 # logging
 import logging
@@ -7,7 +14,6 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-import requests
 
 # Repository
 class Repository(object):
@@ -270,6 +276,12 @@ class RDFResource(Resource):
 		
 		# fire parent Resource init()
 		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+
+		# parse RDF
+		'''
+		for now, assuming json-ld, but will add detectors
+		'''
+		self.graph = Graph().parse(data=self.data.decode('utf-8'), format='json-ld')
 
 
 
