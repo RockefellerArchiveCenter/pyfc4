@@ -1,7 +1,7 @@
 # pyfc4
 
 import json
-from rdflib import Graph, plugin
+import rdflib
 import rdflib_jsonld
 import requests
 
@@ -63,6 +63,24 @@ class Repository(object):
 			logger.debug('context provided, merging with defaults')
 			self.context.update(context)
 
+		# convenience root resource handle
+		self.root_resource = self.get_resource('')
+
+
+	def parse_uri(self, uri):
+	
+		'''
+		this small helper function parses the short uri from the full uri
+			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
+
+		also accept rdflib.term.URIRef
+		'''
+
+		if type(uri) == rdflib.term.URIRef:
+			return uri.toPython().split(self.root)[1]
+		elif type(uri) == str:
+			return uri.split(self.root)[1]
+
 
 	def get_resource(self, uri, response_format=None):
 
@@ -71,6 +89,13 @@ class Repository(object):
 			- issue HEAD request, sniff out content-type to detect NonRDF
 			- issue GET request 
 		'''
+
+		# check, clean resource
+		if type(uri) == rdflib.term.URIRef:
+			uri = self.parse_uri(uri)
+		# if string, and begins with 'http', assume full uri?
+		elif type(uri) == str and uri.startswith('http'):
+			uri = self.parse_uri(uri)
 
 		# HEAD request to detect resource type
 		head_response = self.api.http_request('HEAD', uri)
@@ -96,6 +121,8 @@ class Repository(object):
 
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
 
+
+	
 
 
 # API
@@ -198,6 +225,25 @@ class Resource(object):
 		self.repo = repo
 
 
+	def __repr__(self):
+		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
+
+
+	def parse_uri(self, uri):
+	
+		'''
+		this small helper function parses the short uri from the full uri
+			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
+
+		also accept rdflib.term.URIRef
+		'''
+
+		if type(uri) == rdflib.term.URIRef:
+			return uri.toPython().split(self.repo.root)[1]
+		elif type(uri) == str:
+			return uri.split(self.repo.root)[1]
+
+
 	def check_exists(self):
 		
 		'''
@@ -244,27 +290,26 @@ class Resource(object):
 			
 			# 201, success, refresh
 			if response.status_code == 201:
-				'''
-				If POST, need to capture new uri from response
-					- or during refresh?
-				'''
 
 				# if not specifying uri, capture from response and append to object
-				self.uri = response.text.split(self.repo.root)[1]
+				self.uri = self.parse_uri(response.text)
 
 				# creation successful, update resource
 				self.refresh()
 
 			# 404, assumed POST, target location does not exist
 			elif response.status_code == 404:
+
 				raise Exception('for this POST request, target location does not exist')
 
 			# 409, conflict, resource likely exists
 			elif response.status_code == 409:
+
 				raise Exception('status 409 received, resource already exists')
 			
 			# 410, tombstone present
 			elif response.status_code == 410:
+
 				logger.debug('tombstone for %s detected, aborting' % self.uri)
 				if ignore_tombstone:
 					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
@@ -401,7 +446,7 @@ class RDFResource(Resource):
 			parse_format = parse_format.split(';')[0]
 		
 		# parse and return graph	
-		return Graph().parse(data=self.data.decode('utf-8'), format=parse_format)
+		return rdflib.Graph().parse(data=self.data.decode('utf-8'), format=parse_format)
 
 
 
@@ -420,12 +465,19 @@ class Container(RDFResource):
 		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 
-	def children(self):
+	def children(self, as_resources=False):
 
 		'''
 		method to return children of this resource
 		'''
-		pass
+		children = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://www.w3.org/ns/ldp#contains'),None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving children as resources')
+			children = [ self.repo.get_resource(child) for child in children ]
+
+		return children
 
 
 
@@ -443,7 +495,11 @@ class BasicContainer(Container):
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		self.uri = uri
+		# handle edge cases for None or '/' uris
+		if uri in [None,'/']:
+			self.uri = ''
+		else:
+			self.uri = uri
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
