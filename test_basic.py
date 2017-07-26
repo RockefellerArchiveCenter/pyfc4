@@ -1,6 +1,8 @@
 
 from pyfc4.models import *
 
+import inspect
+import pytest
 import rdflib
 
 # logging
@@ -8,8 +10,6 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-import pytest
 
 
 
@@ -106,6 +106,23 @@ class TestBasicCRUD(object):
 
 		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
 		assert baz.exists
+
+
+
+class TestBasicRelationship(object):
+
+	# get children of foo
+	def test_get_bc_children(self):
+
+		'''
+		gets all children of foo,
+		confirms in the classpath of each child exists Resource class
+		'''
+
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+		for child in foo.children(as_resources=True):
+			assert Resource in inspect.getmro(child.__class__)
+
 
 
 ########################################################
