@@ -1,6 +1,6 @@
 # pyfc4
 
-Python 3.x binding for Fedora Commons 4.x
+Python 3.x client for Fedora Commons 4.x
 
 ## Requirements
 
