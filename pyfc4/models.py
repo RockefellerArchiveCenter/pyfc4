@@ -273,15 +273,16 @@ class Resource(object):
 			self.status_code = updated_self.status_code
 			self.data = updated_self.data
 			self.headers = updated_self.headers
-			self.graph = updated_self.graph
 			self.exists = updated_self.exists
+			# update graph if RDFSource
+			if type(self) != NonRDFSource:
+				self.graph = updated_self.graph
 			# cleanup
 			del(updated_self)
 		else:
 			logger.debug('resource %s not found, dumping values')
 			self._empty_resource_attributes()
 			
-
 
 	def _empty_resource_attributes(self):
 
