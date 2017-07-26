@@ -19,7 +19,7 @@ repo = Repository('http://localhost:8080/rest','ghukill','password', context={'f
 # SETUP
 ########################################################
 @pytest.fixture()
-def before():
+def delete_test_resources():
 	logger.debug('\n\n## tests setup... ##\n')
 	for uri in ['foo','foo/bar','foo/baz']:
 		try:
@@ -33,7 +33,7 @@ def before():
 # TESTS
 ########################################################
 # create foo (basic container)
-@pytest.mark.usefixtures("before")
+@pytest.mark.usefixtures("delete_test_resources")
 def test_create_bc():
 	foo = BasicContainer(repo, 'foo')
 	foo.create()
@@ -92,4 +92,13 @@ def test_get_child_binary():
 	baz = repo.get_resource('foo/baz')
 	assert baz.exists
 
+
+# teardown
+def test_teardown():
+	# delete all test resources again
+	delete_test_resources()
+	# assert deleted
+	for uri in ['foo','foo/bar','foo/baz']:
+		resource = repo.get_resource(uri)
+		assert resource == False
 

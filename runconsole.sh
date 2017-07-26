@@ -1,0 +1,2 @@
+export PYTHONSTARTUP=console.py
+ipython
