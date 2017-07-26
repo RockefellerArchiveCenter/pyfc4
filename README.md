@@ -7,3 +7,17 @@ Python 3.x client for Fedora Commons 4.x
 ## Requirements
 
   * Python 3.x
+
+## Installation
+
+```
+pip install -e .
+```
+
+## Tests
+
+Requires `pyfc4` installed as module.
+
+```
+./runtests.sh
+```
