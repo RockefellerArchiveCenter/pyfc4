@@ -1,7 +1,7 @@
 # pyfc4
 
 import json
-from rdflib import Graph, plugin
+import rdflib
 import rdflib_jsonld
 import requests
 
@@ -63,6 +63,24 @@ class Repository(object):
 			logger.debug('context provided, merging with defaults')
 			self.context.update(context)
 
+		# convenience root resource handle
+		self.root_resource = self.get_resource('')
+
+
+	def parse_uri(self, uri):
+	
+		'''
+		this small helper function parses the short uri from the full uri
+			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
+
+		also accept rdflib.term.URIRef
+		'''
+
+		if type(uri) == rdflib.term.URIRef:
+			return uri.toPython().split(self.root)[1]
+		elif type(uri) == str:
+			return uri.split(self.root)[1]
+
 
 	def get_resource(self, uri, response_format=None):
 
@@ -71,6 +89,13 @@ class Repository(object):
 			- issue HEAD request, sniff out content-type to detect NonRDF
 			- issue GET request 
 		'''
+
+		# check, clean resource
+		if type(uri) == rdflib.term.URIRef:
+			uri = self.parse_uri(uri)
+		# if string, and begins with 'http', assume full uri?
+		elif type(uri) == str and uri.startswith('http'):
+			uri = self.parse_uri(uri)
 
 		# HEAD request to detect resource type
 		head_response = self.api.http_request('HEAD', uri)
@@ -96,6 +121,8 @@ class Repository(object):
 
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
 
+
+	
 
 
 # API
@@ -198,6 +225,25 @@ class Resource(object):
 		self.repo = repo
 
 
+	def __repr__(self):
+		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
+
+
+	def parse_uri(self, uri):
+	
+		'''
+		this small helper function parses the short uri from the full uri
+			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
+
+		also accept rdflib.term.URIRef
+		'''
+
+		if type(uri) == rdflib.term.URIRef:
+			return uri.toPython().split(self.repo.root)[1]
+		elif type(uri) == str:
+			return uri.split(self.repo.root)[1]
+
+
 	def check_exists(self):
 		
 		'''
@@ -213,23 +259,57 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, ignore_tombstone=False):
+	def create(self, specify_uri=False, ignore_tombstone=False):
 
 		'''
 		when object is created, self.data and self.headers are passed with the requests
 			- when creating NonRDFSource (Binary) type resources, this resource must include 
 			content for self.data and a header value for self.headers['Content-Type']
+
+		URIs and PUT/POST
+			- if uri is present, assume desired uri and use PUT.
+			- if uri absent, assumed repo assigned uri, use POST
 		'''
 
-		# if resource does not, create
-		if not self.exists:
-			response = self.repo.api.http_request('PUT', self.uri, self.data, self.headers)
-			# 201, success
+		# if resource exists, raise exception
+		if self.exists:
+			raise Exception('resource exists attribute True, aborting')
+
+		# else, continue
+		else:
+
+			# determine verb based on specify_uri parameter
+			if specify_uri:
+				verb = 'PUT'
+			else:
+				verb = 'POST'
+			logger.debug('creating resource with %s verb' % verb)
+
+			# fire request
+			response = self.repo.api.http_request(verb, self.uri, self.data, self.headers)
+			
+			# 201, success, refresh
 			if response.status_code == 201:
+
+				# if not specifying uri, capture from response and append to object
+				self.uri = self.parse_uri(response.text)
+
 				# creation successful, update resource
 				self.refresh()
+
+			# 404, assumed POST, target location does not exist
+			elif response.status_code == 404:
+
+				raise Exception('for this POST request, target location does not exist')
+
+			# 409, conflict, resource likely exists
+			elif response.status_code == 409:
+
+				raise Exception('status 409 received, resource already exists')
+			
 			# 410, tombstone present
-			if response.status_code == 410:
+			elif response.status_code == 410:
+
 				logger.debug('tombstone for %s detected, aborting' % self.uri)
 				if ignore_tombstone:
 					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
@@ -238,8 +318,11 @@ class Resource(object):
 						self.create()
 					else:
 						raise Exception('Could not remove tombstone for %s' % self.uri)
-		else:
-			logger.debug('resource %s exists, aborting create' % self.uri)
+
+			# unknown status code
+			else:
+				raise Exception('unknown error creating, status code: %s' % response.status_code)
+
 
 
 	def delete(self, remove_tombstone=True):
@@ -363,7 +446,7 @@ class RDFResource(Resource):
 			parse_format = parse_format.split(';')[0]
 		
 		# parse and return graph	
-		return Graph().parse(data=self.data.decode('utf-8'), format=parse_format)
+		return rdflib.Graph().parse(data=self.data.decode('utf-8'), format=parse_format)
 
 
 
@@ -382,12 +465,19 @@ class Container(RDFResource):
 		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 
-	def children(self):
+	def children(self, as_resources=False):
 
 		'''
 		method to return children of this resource
 		'''
-		pass
+		children = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://www.w3.org/ns/ldp#contains'),None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving children as resources')
+			children = [ self.repo.get_resource(child) for child in children ]
+
+		return children
 
 
 
@@ -403,9 +493,13 @@ class BasicContainer(Container):
 		- "The important thing to notice is that by posting to a Basic Container, the LDP server automatically adds a triple with ldp:contains predicate pointing to the new resource created."
 	'''
 	
-	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		self.uri = uri
+		# handle edge cases for None or '/' uris
+		if uri in [None,'/']:
+			self.uri = ''
+		else:
+			self.uri = uri
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
