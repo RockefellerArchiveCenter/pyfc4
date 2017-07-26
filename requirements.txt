@@ -1,4 +1,4 @@
-pyteset
+pytest
 rdflib
 rdflib-jsonld
 requests
