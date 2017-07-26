@@ -5,6 +5,7 @@ services:
 before_install:
   - docker pull thomaszastrow/fedora-commons
   - docker run -d=true -p 8080:8080 -t -i thomaszastrow/fedora-commons /bin/bash
+  - echo "import time; time.sleep(120)" | python
 python:
   - "3.5"
 # command to install dependencies
