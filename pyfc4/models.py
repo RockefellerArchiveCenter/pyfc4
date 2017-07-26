@@ -278,10 +278,29 @@ class RDFResource(Resource):
 		super().__init__(repo, data=data, headers=headers, status_code=status_code)
 
 		# parse RDF
+		self.graph = self.parse_graph()
+
+
+	def parse_graph(self):
+
 		'''
-		for now, assuming json-ld, but will add detectors
+		use Content-Type from headers to determine parsing method
 		'''
-		self.graph = Graph().parse(data=self.data.decode('utf-8'), format='json-ld')
+
+		# handle edge case for content-types not recognized by rdflib parser
+		if self.headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = self.headers['Content-Type']
+
+		# clean parse format for rdf parser
+		# https://www.w3.org/2008/01/rdf-media-types
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse and return graph	
+		return Graph().parse(data=self.data.decode('utf-8'), format=parse_format)
 
 
 

@@ -21,6 +21,21 @@ def get_bc():
 	foo = repo.get_resource('foo')
 	return foo.exists()
 
+# test RDF parsing of different Content-Types
+def test_graph_parse():
+	content_types = [
+		'application/ld+json',
+		'application/n-triples',
+		'application/rdf+xml',
+		'text/n3',
+		'text/plain',
+		'text/turtle'
+	]
+	for content_type in content_types:
+		print("testing parsing of Content-Type: %s" % content_type)
+		foo = repo.get_resource('foo', response_format=content_type)
+	return True
+
 # create foo/bar (basic container)
 def create_child_bc():
 	bar = BasicContainer(repo, 'foo/bar')
@@ -60,6 +75,7 @@ def run_all_tests(cleanup=False):
 	tests = [	
 		create_bc(),
 		get_bc(),
+		test_graph_parse(),
 		create_child_bc(),
 		get_child_bc(),
 		create_child_binary(),
