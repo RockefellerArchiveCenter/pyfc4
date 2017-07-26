@@ -206,14 +206,15 @@ class Resource(object):
 		'''
 
 		response = self.repo.api.http_request('HEAD', self.uri)
-		if response.status_code == 200:
+		self.status_code = response.status_code
+		if self.status_code == 200:
 			self.exists = True
-		if response.status_code == 404:
+		if self.status_code == 404:
 			self.exists = False
 		return self.exists
 
 
-	def create(self):
+	def create(self, ignore_tombstone=False):
 
 		'''
 		when object is created, self.data and self.headers are passed with the requests
@@ -224,8 +225,20 @@ class Resource(object):
 		# if resource does not, create
 		if not self.exists:
 			response = self.repo.api.http_request('PUT', self.uri, self.data, self.headers)
+			# 201, success
 			if response.status_code == 201:
-				self.exists = True
+				# creation successful, update resource
+				self.refresh()
+			# 410, tombstone present
+			if response.status_code == 410:
+				logger.debug('tombstone for %s detected, aborting' % self.uri)
+				if ignore_tombstone:
+					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
+					if response.status_code == 204:
+						logger.debug('tombstone removed, retrying create')
+						self.create()
+					else:
+						raise Exception('Could not remove tombstone for %s' % self.uri)
 		else:
 			logger.debug('resource %s exists, aborting create' % self.uri)
 
@@ -236,10 +249,51 @@ class Resource(object):
 		account for tombstone
 		'''
 
-		self.repo.api.http_request('DELETE', self.uri)
+		response = self.repo.api.http_request('DELETE', self.uri)
+
+		# update exists
+		if response.status_code == 204:
+			# removal successful, updating self
+			self._empty_resource_attributes()
 
 		if remove_tombstone:
 			self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
+
+
+	def refresh(self):
+		
+		'''
+		refreshes exists, status_code, data, and headers from repo for uri
+		'''
+
+		updated_self = self.repo.get_resource(self.uri)
+
+		if updated_self:
+			# update attributes
+			self.status_code = updated_self.status_code
+			self.data = updated_self.data
+			self.headers = updated_self.headers
+			self.graph = updated_self.graph
+			self.exists = updated_self.exists
+			# cleanup
+			del(updated_self)
+		else:
+			logger.debug('resource %s not found, dumping values')
+			self._empty_resource_attributes()
+			
+
+
+	def _empty_resource_attributes(self):
+
+		'''
+		small method to empty values if resource is removed or absent
+		'''
+
+		self.status_code = 404
+		self.data = None
+		self.headers = {}
+		self.graph = None
+		self.exists = False
 
 
 
