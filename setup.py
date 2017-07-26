@@ -7,5 +7,11 @@ setup(name='pyfc4',
       author='Graham Hukill',
       author_email='ghukill@gmail.com',
       license='Apache License, Version 2.0',
+      install_requirements=[
+      	'pytest',
+      	'rdflib',
+      	'rdflib-jsonld',
+      	'requests'
+      ]
       packages=['pyfc4'],
       zip_safe=False)
