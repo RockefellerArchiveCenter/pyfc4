@@ -175,6 +175,7 @@ class API(object):
 		session = requests.Session()
 		request = requests.Request(verb, "%s%s" % (self.repo.root, uri), data=data, headers=headers)
 		prepped_request = session.prepare_request(request)
+
 		response = session.send(prepped_request,
 			stream=False,
 		)
@@ -348,12 +349,6 @@ class Resource(object):
 		# sending attached content as payload (file-like object)
 		https://github.com/emory-libraries/eulfedora/blob/64eaf999fbff39e809bf1d1da377a972c9685441/eulfedora/api.py#L373-L385
 
-		1) If no Content-Type header, but mimetype attribute, set Content-Type header with that
-		2) If data_location present, trumps contents of data attribute ()
-		3) If only .data, handle
-			- if binary data, send as-is (implemented)
-			- if file like object, handle (http://docs.python-requests.org/en/master/user/quickstart/#post-a-multipart-encoded-file)
-
 		Also consider external reference per FC4 spec (https://wiki.duraspace.org/display/FEDORA40/RESTful+HTTP+API+-+Containers#RESTfulHTTPAPI-Containers-BluePOSTCreatenewresourceswithinaLDPcontainer):
 		Example (4): Creating a new binary resource at a specified path redirecting to external content
 			curl -X PUT -H"Content-Type: message/external-body; access-type=URL; URL=\"http://www.example.com/file\"" "http://localhost:8080/rest/node/to/create"
@@ -361,14 +356,67 @@ class Resource(object):
 
 		logger.debug('preparing NonRDFSource data for create/update')
 
-		# mimetype and Content-Type header
+		# handle mimetype / Content-Type
+		self._prep_NonRDF_mimetype()
+
+		# handle binary data
+		self._prep_NonRDF_content()
+		
+
+
+	def _prep_NonRDF_mimetype(self):
+
+		'''
+		implicitly favors Content-Type header if set
+		'''
+
 		# neither present
 		if not self.mimetype and 'Content-Type' not in self.headers.keys():
 			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
+		
 		# mimetype, no Content-Type
 		elif self.mimetype and 'Content-Type' not in self.headers.keys():
 			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
 			self.headers['Content-Type'] = self.mimetype
+
+		# else
+		else:
+			raise Exception('an error was had setting Content-Type')
+
+
+
+	def _prep_NonRDF_content(self):
+
+		'''
+		implicitly favors Content-Location header if set
+
+		alternatively, must handle:
+			1) string / binary
+			2) MAYBE: filepath (likely need flag?)
+				- this one is interesting
+			3) file-like object
+				- want to fire this with `with open()` syntax, so might have to close file, send as path and flag to http_request, then handle there
+			4) http location / uri
+		'''
+
+		# nothing present
+		if not self.data and not self.data_location and 'Content-Location' not in self.headers.keys():
+			raise Exception('creating/updating NonRDFSource requires content from self.data, self.ds_location, or the Content-Location header')
+		
+		elif 'Content-Location' not in self.headers.keys():
+
+			# data_location set, trumps Content self.data
+			if self.data_location:
+				# set appropriate header
+				self.headers['Content-Location'] = self.data_location
+
+			# data attribute is plain text, binary, or file-like object
+			# elif self.data:
+
+
+		else:
+			raise Exception('an error was had preparing binary data')
+
 
 
 	def delete(self, remove_tombstone=True):
