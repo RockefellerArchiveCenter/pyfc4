@@ -391,7 +391,11 @@ class NonRDFSource(Resource):
 	
 	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
 
-		self.uri = uri
+		# handle edge cases for None or '/' uris
+		if uri in [None,'/']:
+			self.uri = ''
+		else:
+			self.uri = uri
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
@@ -470,6 +474,7 @@ class Container(RDFResource):
 		'''
 		method to return children of this resource
 		'''
+
 		children = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://www.w3.org/ns/ldp#contains'),None))]
 
 		# if as_resources, issue GET requests for children and return
@@ -478,6 +483,22 @@ class Container(RDFResource):
 			children = [ self.repo.get_resource(child) for child in children ]
 
 		return children
+
+
+	def parents(self, as_resources=False):
+
+		'''
+		method to return parent of this resource
+		'''
+
+		parents = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://fedora.info/definitions/v4/repository#hasParent'),None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving parent as resource')
+			parents = [ self.repo.get_resource(parent) for parent in parents ]
+
+		return parents
 
 
 
