@@ -20,6 +20,13 @@ testing_container_uri = 'testing'
 repo = Repository('http://localhost:8080/rest','ghukill','password', context={'foo':'http://foo.com'})
 
 
+########################################################
+# TEST MEMORY
+########################################################
+class Mem(object):
+	bc_uri = None
+mem = Mem()
+
 
 ########################################################
 # SETUP
@@ -37,7 +44,7 @@ class TestSetup(object):
 # TESTS
 ########################################################
 
-class TestBasicCRUD(object):
+class TestBasicCRUDPUT(object):
 
 	
 	# create foo (basic container)
@@ -108,6 +115,23 @@ class TestBasicCRUD(object):
 		assert baz.exists
 
 
+	# create BasicContainer with NonRDFSource attributes, expect exception
+	
+	def create_resource_type_mismatch(self):
+		
+		'''
+		When creating a resource, the resource runs .refresh(), which returns the
+		resource type that the repo purports it is.  If this does not match the original
+		resource type of the object that was used to create (e.g. instantiate BasicContainer,
+		but repo comes back and says resource is NonRDFSource), this needs to raise an exception.
+		'''
+
+		goober = BasicContainer(repo, '%s/foo/goober' % testing_container_uri)
+		goober.data = 'this is a test, this is only a test'
+		goober.headers['Content-Type'] = 'text/plain'
+		goober.create(specify_uri=True)
+
+
 
 class TestBasicRelationship(object):
 
@@ -122,6 +146,44 @@ class TestBasicRelationship(object):
 		foo = repo.get_resource('%s/foo' % testing_container_uri)
 		for child in foo.children(as_resources=True):
 			assert Resource in inspect.getmro(child.__class__)
+
+	# get children of foo
+	def test_get_bc_parents(self):
+
+		'''
+		gets parents of bar, expecting foo
+		confirms in the classpath of each child exists Resource class
+		'''
+
+		bar = repo.get_resource('%s/foo/bar' % testing_container_uri)
+		for parent in bar.parents(as_resources=True):
+			assert Resource in inspect.getmro(parent.__class__)
+
+
+
+class TestBasicCRUDPOST(object):
+
+	# create (basic container)
+	def test_bc_crud(self):
+
+		# test create
+		bc = BasicContainer(repo, '%s' % testing_container_uri)
+		bc.create()
+		bc_uri = bc.uri
+		assert bc.exists
+
+		# test get
+		bc = repo.get_resource(bc_uri)
+		assert bc.exists
+
+		# test delete
+		bc.delete()
+		bc = repo.get_resource(bc_uri)
+		assert bc == False
+
+
+
+
 
 
 

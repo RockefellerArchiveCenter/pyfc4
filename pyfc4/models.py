@@ -102,6 +102,7 @@ class Repository(object):
 
 		# item does not exist, return False
 		if head_response.status_code == 404:
+			logger.debug('resource uri %s not found, returning False' % uri)
 			return False
 
 		# assume exists, parse headers for resource type and return instance
@@ -168,12 +169,13 @@ class API(object):
 			else:
 				headers = {'Accept':response_format}
 
-		logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
+		logger.debug("%s request for %s, format %s, headers %s" % (verb, uri, response_format, headers))
 
 		# manually prepare request
 		session = requests.Session()
 		request = requests.Request(verb, "%s%s" % (self.repo.root, uri), data=data, headers=headers)
 		prepped_request = session.prepare_request(request)
+
 		response = session.send(prepped_request,
 			stream=False,
 		)
@@ -214,15 +216,24 @@ class Resource(object):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, data=None, headers={}, status_code=None):
-
-		# resources are combination of data and headers
-		self.data = data
-		self.headers = headers
-		self.status_code = status_code
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
+
+		# handle edge cases for None or '/' uris
+		if uri in [None,'/']:
+			self.uri = ''
+		else:
+			self.uri = uri
+		self.data = data
+		self.headers = headers
+		self.status_code = status_code
+		# if status_code provided, and 200, set exists attribute as True
+		if self.status_code == 200:
+			self.exists = True
+		else:
+			self.exists = False
 
 
 	def __repr__(self):
@@ -278,6 +289,10 @@ class Resource(object):
 		# else, continue
 		else:
 
+			# check if NonRDF, if so, run _prep_NonRDF_data()
+			if type(self) == NonRDFSource:
+				self._prep_NonRDF_data()
+
 			# determine verb based on specify_uri parameter
 			if specify_uri:
 				verb = 'PUT'
@@ -290,26 +305,21 @@ class Resource(object):
 			
 			# 201, success, refresh
 			if response.status_code == 201:
-
 				# if not specifying uri, capture from response and append to object
 				self.uri = self.parse_uri(response.text)
-
 				# creation successful, update resource
 				self.refresh()
 
 			# 404, assumed POST, target location does not exist
 			elif response.status_code == 404:
-
 				raise Exception('for this POST request, target location does not exist')
 
 			# 409, conflict, resource likely exists
 			elif response.status_code == 409:
-
 				raise Exception('status 409 received, resource already exists')
 			
 			# 410, tombstone present
 			elif response.status_code == 410:
-
 				logger.debug('tombstone for %s detected, aborting' % self.uri)
 				if ignore_tombstone:
 					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
@@ -319,17 +329,86 @@ class Resource(object):
 					else:
 						raise Exception('Could not remove tombstone for %s' % self.uri)
 
+			# 415, unsupported media type
+			elif response.status_code == 415:
+				raise Exception('unsupported media type')
+
 			# unknown status code
 			else:
 				raise Exception('unknown error creating, status code: %s' % response.status_code)
 
 
+	def _prep_NonRDF_data(self):
+
+		'''
+		method is used to check/prep data and headers for NonRDFSource create
+
+		This approach from eulfedora might be helpful:
+		# location of content trumps attached content
+		https://github.com/emory-libraries/eulfedora/blob/master/eulfedora/models.py#L361-L367
+		# sending attached content as payload (file-like object)
+		https://github.com/emory-libraries/eulfedora/blob/64eaf999fbff39e809bf1d1da377a972c9685441/eulfedora/api.py#L373-L385
+
+		Also consider external reference per FC4 spec (https://wiki.duraspace.org/display/FEDORA40/RESTful+HTTP+API+-+Containers#RESTfulHTTPAPI-Containers-BluePOSTCreatenewresourceswithinaLDPcontainer):
+		Example (4): Creating a new binary resource at a specified path redirecting to external content
+			curl -X PUT -H"Content-Type: message/external-body; access-type=URL; URL=\"http://www.example.com/file\"" "http://localhost:8080/rest/node/to/create"
+		'''
+
+		logger.debug('preparing NonRDFSource data for create/update')
+
+		# handle mimetype / Content-Type
+		self._prep_NonRDF_mimetype()
+
+		# handle binary data
+		self._prep_NonRDF_content()
+		
+
+	def _prep_NonRDF_mimetype(self):
+
+		'''
+		implicitly favors Content-Type header if set
+		'''
+
+		# neither present
+		if not self.mimetype and 'Content-Type' not in self.headers.keys():
+			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
+		
+		# mimetype, no Content-Type
+		elif self.mimetype and 'Content-Type' not in self.headers.keys():
+			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
+			self.headers['Content-Type'] = self.mimetype
+
+
+	def _prep_NonRDF_content(self):
+
+		'''
+		implicitly favors Content-Location header if set
+
+		alternatively, must handle:
+			1) string / binary
+			2) MAYBE: filepath (likely need flag?)
+				- this one is interesting
+			3) file-like object
+				- want to fire this with `with open()` syntax, so might have to close file, send as path and flag to http_request, then handle there
+			4) http location / uri
+		'''
+
+		# nothing present
+		if not self.data and not self.data_location and 'Content-Location' not in self.headers.keys():
+			raise Exception('creating/updating NonRDFSource requires content from self.data, self.ds_location, or the Content-Location header')
+		
+		elif 'Content-Location' not in self.headers.keys():
+
+			# data_location set, trumps Content self.data
+			if self.data_location:
+				# set appropriate header
+				self.headers['Content-Location'] = self.data_location
+
+			# data attribute is plain text, binary, or file-like object
+			# elif self.data:
+
 
 	def delete(self, remove_tombstone=True):
-
-		'''
-		account for tombstone
-		'''
 
 		response = self.repo.api.http_request('DELETE', self.uri)
 
@@ -349,6 +428,10 @@ class Resource(object):
 		'''
 
 		updated_self = self.repo.get_resource(self.uri)
+
+		# if resource type of updated_self != self, raise exception
+		if type(updated_self) != type(self):
+			raise Exception('Instantiated %s, but repository reports this resource is %s, raising exception' % (type(updated_self), type(self)) )
 
 		if updated_self:
 			# update attributes
@@ -389,20 +472,15 @@ class NonRDFSource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		self.uri = uri
-		self.data = data
-		self.headers = headers
-		self.status_code = status_code
-		# if status_code provided, and 200, set exists attribute as True
-		if self.status_code == 200:
-			self.exists = True
-		else:
-			self.exists = False
-		
-		# fire parent Container init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		# optional attribute for location of data, trumps .data for create/update
+		self.data_location = None
+		# convenience attribute that is written to headers['Content-Type'] for create/update
+		self.mimetype = None
+
+		# fire parent Resource init()
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 
 # 'Binary' alias for NonRDFSource
@@ -418,10 +496,10 @@ class RDFResource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 		
 		# fire parent Resource init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 		# parse RDF
 		if self.exists:
@@ -459,10 +537,10 @@ class Container(RDFResource):
 	https://www.w3.org/TR/ldp/
 	'''
 
-	def __init__(self, repo, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 		
 		# fire parent RDFResource init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 
 	def children(self, as_resources=False):
@@ -470,6 +548,7 @@ class Container(RDFResource):
 		'''
 		method to return children of this resource
 		'''
+
 		children = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://www.w3.org/ns/ldp#contains'),None))]
 
 		# if as_resources, issue GET requests for children and return
@@ -478,6 +557,22 @@ class Container(RDFResource):
 			children = [ self.repo.get_resource(child) for child in children ]
 
 		return children
+
+
+	def parents(self, as_resources=False):
+
+		'''
+		method to return parent of this resource
+		'''
+
+		parents = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://fedora.info/definitions/v4/repository#hasParent'),None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving parent as resource')
+			parents = [ self.repo.get_resource(parent) for parent in parents ]
+
+		return parents
 
 
 
@@ -495,22 +590,8 @@ class BasicContainer(Container):
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		# handle edge cases for None or '/' uris
-		if uri in [None,'/']:
-			self.uri = ''
-		else:
-			self.uri = uri
-		self.data = data
-		self.headers = headers
-		self.status_code = status_code
-		# if status_code provided, and 200, set exists attribute as True
-		if self.status_code == 200:
-			self.exists = True
-		else:
-			self.exists = False
-		
 		# fire parent Container init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 
 
