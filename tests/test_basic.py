@@ -115,6 +115,23 @@ class TestBasicCRUDPUT(object):
 		assert baz.exists
 
 
+	# create BasicContainer with NonRDFSource attributes, expect exception
+	
+	def create_resource_type_mismatch(self):
+		
+		'''
+		When creating a resource, the resource runs .refresh(), which returns the
+		resource type that the repo purports it is.  If this does not match the original
+		resource type of the object that was used to create (e.g. instantiate BasicContainer,
+		but repo comes back and says resource is NonRDFSource), this needs to raise an exception.
+		'''
+
+		goober = BasicContainer(repo, '%s/foo/goober' % testing_container_uri)
+		goober.data = 'this is a test, this is only a test'
+		goober.headers['Content-Type'] = 'text/plain'
+		goober.create(specify_uri=True)
+
+
 
 class TestBasicRelationship(object):
 

@@ -102,6 +102,7 @@ class Repository(object):
 
 		# item does not exist, return False
 		if head_response.status_code == 404:
+			logger.debug('resource uri %s not found, returning False' % uri)
 			return False
 
 		# assume exists, parse headers for resource type and return instance
@@ -168,7 +169,7 @@ class API(object):
 			else:
 				headers = {'Accept':response_format}
 
-		logger.debug("%s request for %s, format %s" % (verb, uri, response_format))
+		logger.debug("%s request for %s, format %s, headers %s" % (verb, uri, response_format, headers))
 
 		# manually prepare request
 		session = requests.Session()
@@ -287,6 +288,10 @@ class Resource(object):
 		# else, continue
 		else:
 
+			# check if NonRDF, if so, run _prep_NonRDF_data()
+			if type(self) == NonRDFSource:
+				self._prep_NonRDF_data()
+
 			# determine verb based on specify_uri parameter
 			if specify_uri:
 				verb = 'PUT'
@@ -299,26 +304,21 @@ class Resource(object):
 			
 			# 201, success, refresh
 			if response.status_code == 201:
-
 				# if not specifying uri, capture from response and append to object
 				self.uri = self.parse_uri(response.text)
-
 				# creation successful, update resource
 				self.refresh()
 
 			# 404, assumed POST, target location does not exist
 			elif response.status_code == 404:
-
 				raise Exception('for this POST request, target location does not exist')
 
 			# 409, conflict, resource likely exists
 			elif response.status_code == 409:
-
 				raise Exception('status 409 received, resource already exists')
 			
 			# 410, tombstone present
 			elif response.status_code == 410:
-
 				logger.debug('tombstone for %s detected, aborting' % self.uri)
 				if ignore_tombstone:
 					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
@@ -328,17 +328,50 @@ class Resource(object):
 					else:
 						raise Exception('Could not remove tombstone for %s' % self.uri)
 
+			# 415, unsupported media type
+			elif response.status_code == 415:
+				raise Exception('unsupported media type')
+
 			# unknown status code
 			else:
 				raise Exception('unknown error creating, status code: %s' % response.status_code)
 
 
+	def _prep_NonRDF_data(self):
+
+		'''
+		method is used to check/prep data and headers for NonRDFSource create
+
+		This approach from eulfedora might be helpful:
+		# location of content trumps attached content
+		https://github.com/emory-libraries/eulfedora/blob/master/eulfedora/models.py#L361-L367
+		# sending attached content as payload (file-like object)
+		https://github.com/emory-libraries/eulfedora/blob/64eaf999fbff39e809bf1d1da377a972c9685441/eulfedora/api.py#L373-L385
+
+		1) If no Content-Type header, but mimetype attribute, set Content-Type header with that
+		2) If data_location present, trumps contents of data attribute ()
+		3) If only .data, handle
+			- if binary data, send as-is (implemented)
+			- if file like object, handle (http://docs.python-requests.org/en/master/user/quickstart/#post-a-multipart-encoded-file)
+
+		Also consider external reference per FC4 spec (https://wiki.duraspace.org/display/FEDORA40/RESTful+HTTP+API+-+Containers#RESTfulHTTPAPI-Containers-BluePOSTCreatenewresourceswithinaLDPcontainer):
+		Example (4): Creating a new binary resource at a specified path redirecting to external content
+			curl -X PUT -H"Content-Type: message/external-body; access-type=URL; URL=\"http://www.example.com/file\"" "http://localhost:8080/rest/node/to/create"
+		'''
+
+		logger.debug('preparing NonRDFSource data for create/update')
+
+		# mimetype and Content-Type header
+		# neither present
+		if not self.mimetype and 'Content-Type' not in self.headers.keys():
+			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
+		# mimetype, no Content-Type
+		elif self.mimetype and 'Content-Type' not in self.headers.keys():
+			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
+			self.headers['Content-Type'] = self.mimetype
+
 
 	def delete(self, remove_tombstone=True):
-
-		'''
-		account for tombstone
-		'''
 
 		response = self.repo.api.http_request('DELETE', self.uri)
 
@@ -358,6 +391,10 @@ class Resource(object):
 		'''
 
 		updated_self = self.repo.get_resource(self.uri)
+
+		# if resource type of updated_self != self, raise exception
+		if type(updated_self) != type(self):
+			raise Exception('Instantiated %s, but repository reports this resource is %s, raising exception' % (type(updated_self), type(self)) )
 
 		if updated_self:
 			# update attributes
@@ -399,6 +436,11 @@ class NonRDFSource(Resource):
 	'''
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+
+		# optional attribute for location of data, trumps .data for create/update
+		self.data_location = None
+		# convenience attribute that is written to headers['Content-Type'] for create/update
+		self.mimetype = None
 
 		# fire parent Resource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
