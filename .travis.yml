@@ -14,11 +14,11 @@ before_install:
   - docker pull thomaszastrow/fedora-commons
   - docker run -d=true -p 8080:8080 -t -i thomaszastrow/fedora-commons /bin/bash
   - echo "import time; time.sleep(60)" | python
-  - pip3 install -r requirements.txt
-  - pip3 install -e .
+  # - pip3 install -r requirements.txt
+  # - pip3 install -e .
 python:
   - "3.5"
 # command to install dependencies
-#install: "pip3 install -e ."
+install: "pip3 install -e ."
 # command to run tests
 script: pytest
