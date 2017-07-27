@@ -214,15 +214,24 @@ class Resource(object):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, data=None, headers={}, status_code=None):
-
-		# resources are combination of data and headers
-		self.data = data
-		self.headers = headers
-		self.status_code = status_code
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
+
+		# handle edge cases for None or '/' uris
+		if uri in [None,'/']:
+			self.uri = ''
+		else:
+			self.uri = uri
+		self.data = data
+		self.headers = headers
+		self.status_code = status_code
+		# if status_code provided, and 200, set exists attribute as True
+		if self.status_code == 200:
+			self.exists = True
+		else:
+			self.exists = False
 
 
 	def __repr__(self):
@@ -389,24 +398,10 @@ class NonRDFSource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, uri, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		# handle edge cases for None or '/' uris
-		if uri in [None,'/']:
-			self.uri = ''
-		else:
-			self.uri = uri
-		self.data = data
-		self.headers = headers
-		self.status_code = status_code
-		# if status_code provided, and 200, set exists attribute as True
-		if self.status_code == 200:
-			self.exists = True
-		else:
-			self.exists = False
-		
-		# fire parent Container init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		# fire parent Resource init()
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 
 # 'Binary' alias for NonRDFSource
@@ -422,10 +417,10 @@ class RDFResource(Resource):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 		
 		# fire parent Resource init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 		# parse RDF
 		if self.exists:
@@ -463,10 +458,10 @@ class Container(RDFResource):
 	https://www.w3.org/TR/ldp/
 	'''
 
-	def __init__(self, repo, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 		
 		# fire parent RDFResource init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 
 	def children(self, as_resources=False):
@@ -516,22 +511,8 @@ class BasicContainer(Container):
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		# handle edge cases for None or '/' uris
-		if uri in [None,'/']:
-			self.uri = ''
-		else:
-			self.uri = uri
-		self.data = data
-		self.headers = headers
-		self.status_code = status_code
-		# if status_code provided, and 200, set exists attribute as True
-		if self.status_code == 200:
-			self.exists = True
-		else:
-			self.exists = False
-		
 		# fire parent Container init()
-		super().__init__(repo, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 
 
