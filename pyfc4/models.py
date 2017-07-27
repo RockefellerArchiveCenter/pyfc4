@@ -363,7 +363,6 @@ class Resource(object):
 		self._prep_NonRDF_content()
 		
 
-
 	def _prep_NonRDF_mimetype(self):
 
 		'''
@@ -378,11 +377,6 @@ class Resource(object):
 		elif self.mimetype and 'Content-Type' not in self.headers.keys():
 			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
 			self.headers['Content-Type'] = self.mimetype
-
-		# else
-		else:
-			raise Exception('an error was had setting Content-Type')
-
 
 
 	def _prep_NonRDF_content(self):
@@ -412,11 +406,6 @@ class Resource(object):
 
 			# data attribute is plain text, binary, or file-like object
 			# elif self.data:
-
-
-		else:
-			raise Exception('an error was had preparing binary data')
-
 
 
 	def delete(self, remove_tombstone=True):
