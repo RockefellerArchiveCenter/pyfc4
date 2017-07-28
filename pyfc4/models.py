@@ -77,10 +77,13 @@ class Repository(object):
 		also accept rdflib.term.URIRef
 		'''
 
+		# URIref, extrac string
 		if type(uri) == rdflib.term.URIRef:
-			return uri.toPython().split(self.root)[1]
+			return uri.toPython()
+
+		# "short" uri, expand with repo.root
 		elif type(uri) == str:
-			return uri.split(self.root)[1]
+			return "%s%s" % (self.root, uri)
 
 
 	def get_resource(self, uri, response_format=None):
@@ -94,8 +97,8 @@ class Repository(object):
 		# check, clean resource
 		if type(uri) == rdflib.term.URIRef:
 			uri = self.parse_uri(uri)
-		# if string, and begins with 'http', assume full uri?
-		elif type(uri) == str and uri.startswith('http'):
+		# if string, and does NOT begin with 'http', assume short uri
+		elif type(uri) == str and not uri.startswith('http'):
 			uri = self.parse_uri(uri)
 
 		# HEAD request to detect resource type
@@ -118,10 +121,11 @@ class Repository(object):
 				# retrieve RDFSource resource
 				get_response = self.api.http_request('GET', uri, response_format=response_format)
 
-			# NonRDFSource, retrieve with proper content negotiation
+			# NonRDFSource, retrieve with proper Content-Type header, and no Accept header
 			else:
 				get_response = self.api.http_request('GET', uri, headers={'Content-Type':head_response.headers['Content-Type']}, is_rdf=False)
 
+			# fire request
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
 
 
@@ -176,7 +180,7 @@ class API(object):
 
 		# manually prepare request
 		session = requests.Session()
-		request = requests.Request(verb, "%s%s" % (self.repo.root, uri), data=data, headers=headers)
+		request = requests.Request(verb, uri, data=data, headers=headers)
 		prepped_request = session.prepare_request(request)
 		response = session.send(prepped_request,
 			stream=False,
