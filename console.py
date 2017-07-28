@@ -29,22 +29,10 @@ def create_demo_resources():
 	bar.create(specify_uri=True)
 
 	# baz
-	baz = BasicContainer(repo, 'foo/baz')
+	baz = Binary(repo, 'foo/baz')
 	baz.data = open('README.md','rb')
 	baz.mimetype = 'text/plain'
 	baz.create(specify_uri=True)
-
-
-def load_dummy_resources():
-	
-	foo = repo.get_resource('foo')
-	global foo
-
-	bar = repo.get_resource('foo/bar')
-	global bar
-
-	baz = repo.get_resource('foo/baz')
-	global baz
 
 
 def delete_dummy_resources():

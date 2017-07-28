@@ -224,57 +224,6 @@ class API(object):
 
 
 
-# # Client for reading, writing RDF triples
-# class RDFClient(object):
-
-# 	'''
-# 	Client for adding, writing, reading RDF triples from a resource
-# 	'''
-	
-# 	def __init__(self, repo, resource_uri, graph, rdf_prefixes_mixins=None):
-
-# 		# attach repo instance with api
-# 		self.repo = repo
-# 		# resource uri
-# 		self.resource_uri = resource_uri
-# 		# graph instance from resource
-# 		self.graph = graph
-# 		# convenience instance of RDFPrefixes
-# 		self.prefixes = RDFPrefixes(repo, rdf_prefixes_mixins)
-
-
-# 	def add_triple(self,spo_tup):
-
-# 		'''
-# 		add triple by providing s,p,o
-# 		'''
-
-
-		
-
-# 	def set_triple(self):
-# 		'''
-# 		without knowing s,p, or o, set s,p, or o
-# 		'''
-
-
-# 	def remove_triple(self):
-
-# 		'''
-# 		remove triple by supplying s,p,o
-# 		'''
-# 		pass
-
-
-# 	def modify_triple(self):
-
-# 		'''
-# 		modify s,p, or o for a triple
-# 		'''
-# 		pass
-
-
-
 class RDFPrefixes(object):
 
 	'''
