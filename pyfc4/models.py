@@ -120,7 +120,7 @@ class Repository(object):
 
 			# NonRDFSource, retrieve with proper content negotiation
 			else:
-				get_response = self.api.http_request('GET', uri, headers={'Content-Type':head_response.headers['Content-Type']}, NonRDF=True)
+				get_response = self.api.http_request('GET', uri, headers={'Content-Type':head_response.headers['Content-Type']}, is_rdf=False)
 
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
 
@@ -145,11 +145,11 @@ class API(object):
 			data=None,
 			headers=None,
 			response_format=None,
-			NonRDF = False
+			is_rdf = True
 		):
 
-		if not NonRDF:
-			# set content negotiated response format for RDFSources
+		# set content negotiated response format for RDFSources
+		if is_rdf:
 			'''
 			Acceptable content negotiated response formats include:
 				application/ld+json

@@ -20,13 +20,6 @@ testing_container_uri = 'testing'
 repo = Repository('http://localhost:8080/rest','ghukill','password', context={'foo':'http://foo.com'})
 
 
-########################################################
-# TEST MEMORY
-########################################################
-class Mem(object):
-	bc_uri = None
-mem = Mem()
-
 
 ########################################################
 # SETUP
@@ -131,6 +124,7 @@ class TestBasicCRUDPUT(object):
 		goober.create(specify_uri=True)
 
 
+
 class TestBinaryUpload(object):
 
 	# upload file-like object
@@ -143,12 +137,13 @@ class TestBinaryUpload(object):
 
 
 	# upload via Content-Location header
-	def test_file_like_object(self):
+	def test_remote_location(self):
 		baz2 = Binary(repo, '%s/foo/baz2' % testing_container_uri)
-		baz2.data_location = 'http://digital.library.wayne.edu/loris/fedora:wayne:EM02_55_143_1%7CEM02a55_143_1d_JP2/full/full/0/default.jpg'
+		baz2.data_location = 'https://upload.wikimedia.org/wikipedia/en/d/d3/FremontTroll.jpg'
 		baz2.headers['Content-Type'] = 'image/jpeg'
 		baz2.create(specify_uri=True)
 		assert baz2.exists
+
 
 
 class TestBasicRelationship(object):
