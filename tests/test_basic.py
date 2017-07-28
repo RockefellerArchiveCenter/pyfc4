@@ -4,6 +4,7 @@ from pyfc4.models import *
 import inspect
 import pytest
 import rdflib
+import time
 
 # logging
 import logging
@@ -27,6 +28,16 @@ repo = Repository('http://localhost:8080/rest','ghukill','password', context={'f
 class TestSetup(object):
 
 	def test_create_testing_container(self):
+
+		# attempt delete
+		try:
+			response = repo.api.http_request('DELETE', '%s' % testing_container_uri)
+		except:
+			logger.debug("uri %s not found to remove" % testing_container_uri)
+		try:
+			response = repo.api.http_request('DELETE', '%s/fcr:tombstone' % testing_container_uri)
+		except:
+			logger.debug("uri %s tombstone not found to remove" % testing_container_uri)
 
 		tc = BasicContainer(repo, testing_container_uri)
 		tc.create(specify_uri=True)
@@ -95,8 +106,8 @@ class TestBasicCRUDPUT(object):
 	def test_create_child_binary(self):
 
 		baz = Binary(repo, '%s/foo/baz' % testing_container_uri)
-		baz.data = 'this is a test, this is only a test'
-		baz.headers['Content-Type'] = 'text/plain'
+		baz.binary.data = 'this is a test, this is only a test'
+		baz.binary.mimetype = 'text/plain'
 		baz.create(specify_uri=True)
 		assert baz.exists
 
@@ -125,22 +136,47 @@ class TestBasicCRUDPUT(object):
 
 
 
+class TestURIParsing(object):
+
+	'''
+	assume 'foo' exists for all
+	'''
+
+	def test_full_uri_string(self):
+		foo = repo.get_resource('http://localhost:8080/rest/%s/foo' % testing_container_uri)
+		assert foo.exists
+
+
+	def test_short_uri_string(self):
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+		assert foo.exists
+
+
+	def test_URIRef_uri(self):
+		foo = repo.get_resource(rdflib.term.URIRef('http://localhost:8080/rest/%s/foo' % testing_container_uri))
+		assert foo.exists
+
+
+
 class TestBinaryUpload(object):
+
 
 	# upload file-like object
 	def test_file_like_object(self):
+		
 		baz1 = Binary(repo, '%s/foo/baz1' % testing_container_uri)
-		baz1.data = open('README.md','rb')
-		baz1.headers['Content-Type'] = 'text/plain'
+		baz1.binary.data = open('README.md','rb')
+		baz1.binary.mimetype = 'text/plain'
 		baz1.create(specify_uri=True)
 		assert baz1.exists
 
 
 	# upload via Content-Location header
 	def test_remote_location(self):
+
 		baz2 = Binary(repo, '%s/foo/baz2' % testing_container_uri)
-		baz2.data_location = 'https://upload.wikimedia.org/wikipedia/en/d/d3/FremontTroll.jpg'
-		baz2.headers['Content-Type'] = 'image/jpeg'
+		baz2.binary.location = 'http://digital.library.wayne.edu/loris/fedora:wayne:vmc77220%7Cvmc77220_JP2/full/full/0/default.jpg'
+		baz2.binary.mimetype = 'image/jpeg'
 		baz2.create(specify_uri=True)
 		assert baz2.exists
 
@@ -176,7 +212,7 @@ class TestBasicRelationship(object):
 
 class TestBasicCRUDPOST(object):
 
-	# create (basic container)
+	# create, get, and delete POSTed resource
 	def test_bc_crud(self):
 
 		# test create

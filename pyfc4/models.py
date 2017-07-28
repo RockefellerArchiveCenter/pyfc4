@@ -5,6 +5,7 @@ import json
 import rdflib
 import rdflib_jsonld
 import requests
+from types import SimpleNamespace
 
 # logging
 import logging
@@ -65,27 +66,31 @@ class Repository(object):
 			self.context.update(context)
 
 		# convenience root resource handle
-		self.root_resource = self.get_resource('')
+		# self.root_resource = self.get_resource('')
 
 
 	def parse_uri(self, uri):
 	
 		'''
-		this small helper function parses the short uri from the full uri
-			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
-
-		also accept rdflib.term.URIRef
+		parses and cleans up possible uri inputs, return instance of rdflib.term.URIRef
 		'''
 
-		# URIref, extrac string
-		if type(uri) == rdflib.term.URIRef:
-			return uri.toPython()
+		# no uri provided, assume root
+		if not uri:
+			return rdflib.term.URIRef(self.root)
 
-		# "short" uri, expand with repo.root
-		elif type(uri) == str and not uri.startswith('http'):
-			return "%s%s" % (self.root, uri)
+		# string uri provided
+		elif type(uri) == str:
 
-		# else, assume full uri
+			# assume "short" uri, expand with repo.root
+			if type(uri) == str and not uri.startswith('http'):
+				return rdflib.term.URIRef("%s%s" % (self.root, uri))
+
+			# else, assume full uri
+			else:
+				return rdflib.term.URIRef(uri)
+
+		# already cleaned and URIRef type
 		else:
 			return uri
 
@@ -97,13 +102,6 @@ class Repository(object):
 			- issue HEAD request, sniff out content-type to detect NonRDF
 			- issue GET request 
 		'''
-
-		# # check, clean resource
-		# if type(uri) == rdflib.term.URIRef:
-		# 	uri = self.parse_uri(uri)
-		# # if string, and does NOT begin with 'http', assume short uri
-		# elif type(uri) == str and not uri.startswith('http'):
-		# 	uri = self.parse_uri(uri)
 
 		# handle uri
 		uri = self.parse_uri(uri)
@@ -117,23 +115,20 @@ class Repository(object):
 			return False
 
 		# assume exists, parse headers for resource type and return instance
-		else:
+		elif head_response.status_code == 200:
 
 			# parse LDP resource type from headers
 			resource_type = self.api.parse_resource_type(head_response)
 			logger.debug('using resource type: %s' % resource_type)
 
-			# RDFSource
-			if resource_type != NonRDFSource:
-				# retrieve RDFSource resource
-				get_response = self.api.http_request('GET', uri, response_format=response_format)
-
-			# NonRDFSource, retrieve with proper Content-Type header, and no Accept header
-			else:
-				get_response = self.api.http_request('GET', uri, headers={'Content-Type':head_response.headers['Content-Type']}, is_rdf=False)
+			# fire GET request
+			get_response = self.api.http_request('GET', "%s/fcr:metadata" % uri, response_format=response_format)
 
 			# fire request
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
+
+		else:
+			raise Exception('error retrieving resource uri %s' % uri)
 
 
 
@@ -155,6 +150,7 @@ class API(object):
 			uri,
 			data=None,
 			headers=None,
+			files=None,
 			response_format=None,
 			is_rdf = True
 		):
@@ -182,12 +178,16 @@ class API(object):
 				else:
 					headers = {'Accept':response_format}
 
-		# debug
+
+		# prepare uri for HTTP request
+		if type(uri) == rdflib.term.URIRef:
+			uri = uri.toPython()
+
 		logger.debug("%s request for %s, format %s, headers %s" % (verb, uri, response_format, headers))
 
 		# manually prepare request
 		session = requests.Session()
-		request = requests.Request(verb, uri, data=data, headers=headers)
+		request = requests.Request(verb, uri, data=data, headers=headers, files=files)
 		prepped_request = session.prepare_request(request)
 		response = session.send(prepped_request,
 			stream=False,
@@ -217,32 +217,6 @@ class API(object):
 		else:
 			logger.debug('could not determine resource type from Link header, returning False')
 			return False
-
-
-
-# Client for reading, writing RDF triples
-class RDFClient(object):
-
-	'''
-	Client for adding, writing, reading RDF triples from a resource
-	'''
-	
-	def __init__(self, repo, rdf_prefixes_mixins=None):
-
-		self.repo = repo
-		self.prefixes = RDFPrefixes(repo, rdf_prefixes_mixins)
-
-
-	def add_triple(self):
-		pass
-
-
-	def remove_triple(self):
-		pass
-
-
-	def modify_triple(self):
-		pass
 
 
 
@@ -278,12 +252,10 @@ class Resource(object):
 		# repository handle is pinned to resource instance here
 		self.repo = repo
 
-		# handle and parse uri
-		if uri in [None,'/']:
-			self.uri = ''
-		else:
-			self.uri = self.repo.parse_uri(uri)
-		self.data = data
+		# parse uri with parse_uri() from repo instance
+		self.uri = self.repo.parse_uri(uri)
+		
+		# HTTP
 		self.headers = headers
 		self.status_code = status_code
 		# if status_code provided, and 200, set exists attribute as True
@@ -292,27 +264,16 @@ class Resource(object):
 		else:
 			self.exists = False
 
-		# RDF Client
-		self.rdf = RDFClient(self.repo, rdf_prefixes_mixins={'goober':'http://tronic#'})
+		# RDF
+		self.rdf = SimpleNamespace()
+		self.rdf.data = data
+		self.rdf.prefixes = RDFPrefixes(self.repo)
+		if self.exists:
+			self.graph = self.parse_graph()
 
 
 	def __repr__(self):
 		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
-
-
-	def parse_uri(self, uri):
-	
-		'''
-		this small helper function parses the short uri from the full uri
-			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
-
-		also accept rdflib.term.URIRef
-		'''
-
-		if type(uri) == rdflib.term.URIRef:
-			return uri.toPython().split(self.repo.root)[1]
-		elif type(uri) == str:
-			return uri.split(self.repo.root)[1]
 
 
 	def check_exists(self):
@@ -330,19 +291,34 @@ class Resource(object):
 		return self.exists
 
 
+	def parse_graph(self):
+
+		'''
+		use Content-Type from headers to determine parsing method
+		'''
+
+		# handle edge case for content-types not recognized by rdflib parser
+		if self.headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = self.headers['Content-Type']
+
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse and return graph	
+		return rdflib.Graph().parse(data=self.rdf.data.decode('utf-8'), format=parse_format)
+
+
 	def create(self, specify_uri=False, ignore_tombstone=False):
 
 		'''
 		when object is created, self.data and self.headers are passed with the requests
-			- when creating NonRDFSource (Binary) type resources, this resource must include 
-			content for self.data and a header value for self.headers['Content-Type']
-
-		URIs and PUT/POST
-			- if uri is present, assume desired uri and use PUT.
-			- if uri absent, assumed repo assigned uri, use POST
 		'''
 
-		# if resource exists, raise exception
+		# if resource claims existence, raise exception
 		if self.exists:
 			raise Exception('resource exists attribute True, aborting')
 
@@ -354,19 +330,28 @@ class Resource(object):
 				verb = 'PUT'
 			else:
 				verb = 'POST'
-			logger.debug('creating resource with %s verb' % verb)
-
-			# check if NonRDF, if so, run _prep_NonRDF_data()
-			if type(self) == NonRDFSource:
-				self._prep_NonRDF_data()
-
-			# fire request
-			response = self.repo.api.http_request(verb, self.uri, self.data, self.headers)
 			
+			logger.debug('creating resource %s with verb %s' % (self.uri, verb))
+
+			# check if NonRDFSource, if so, run _prep_binary_data() and set data to self.binary.data
+			if type(self) == NonRDFSource:
+				self._prep_binary_data()
+				data = self.binary.data
+			# otherwise, set data as self.rdf.data
+			else:
+				data = self.rdf.data
+			
+			# fire creation request
+			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
+			return self._handle_creation(response, ignore_tombstone)
+			
+
+	def _handle_creation(self, response, ignore_tombstone):
+
 			# 201, success, refresh
 			if response.status_code == 201:
 				# if not specifying uri, capture from response and append to object
-				self.uri = self.parse_uri(response.text)
+				self.uri = self.repo.parse_uri(response.text)
 				# creation successful, update resource
 				self.refresh()
 
@@ -397,6 +382,9 @@ class Resource(object):
 			else:
 				raise Exception('unknown error creating, status code: %s' % response.status_code)
 
+			# if all goes well, return True
+			return True
+
 
 	def delete(self, remove_tombstone=True):
 
@@ -426,7 +414,7 @@ class Resource(object):
 		if updated_self:
 			# update attributes
 			self.status_code = updated_self.status_code
-			self.data = updated_self.data
+			self.rdf.data = updated_self.rdf.data
 			self.headers = updated_self.headers
 			self.exists = updated_self.exists
 			# update graph if RDFSource
@@ -446,10 +434,55 @@ class Resource(object):
 		'''
 
 		self.status_code = 404
-		self.data = None
 		self.headers = {}
 		self.graph = None
 		self.exists = False
+
+		# recreate rdf data
+		self.rdf = SimpleNamespace()
+		self.rdf.data = None
+		self.rdf.prefixes = RDFPrefixes(self.repo)
+
+		# if NonRDF recreate binary data
+		if type(self) == NonRDFSource:
+			# binary data
+			self.binary = SimpleNamespace()
+			self.binary.delivery = None
+			self.binary.data = None
+			self.binary.stream = False
+			self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
+			self.binary.location = None
+
+
+	def add_triple(self,spo_tup):
+
+		'''
+		add triple by providing s,p,o
+		'''
+
+
+	def set_triple(self):
+		
+		'''
+		without knowing s,p, or o, set s,p, or o
+		'''
+		pass
+
+
+	def remove_triple(self):
+
+		'''
+		remove triple by supplying s,p,o
+		'''
+		pass
+
+
+	def modify_triple(self):
+
+		'''
+		modify s,p, or o for a triple
+		'''
+		pass
 
 
 
@@ -464,18 +497,21 @@ class NonRDFSource(Resource):
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		# optional attribute for location of data, trumps .data for create/update
-		self.data_location = None
-		# attribute to note data type
-		self.data_type = None
-		# convenience attribute that is written to headers['Content-Type'] for create/update
 		self.mimetype = None
 
 		# fire parent Resource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
+		# binary data
+		self.binary = SimpleNamespace()
+		self.binary.delivery = None
+		self.binary.data = None
+		self.binary.stream = False
+		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
+		self.binary.location = None
 
-	def _prep_NonRDF_data(self):
+
+	def _prep_binary_data(self):
 
 		'''
 		method is used to check/prep data and headers for NonRDFSource create
@@ -494,63 +530,64 @@ class NonRDFSource(Resource):
 		logger.debug('preparing NonRDFSource data for create/update')
 
 		# handle mimetype / Content-Type
-		self._prep_NonRDF_mimetype()
+		self._prep_binary_mimetype()
 
 		# handle binary data
-		self._prep_NonRDF_content()
+		self._prep_binary_content()
 		
 
-	def _prep_NonRDF_mimetype(self):
+	def _prep_binary_mimetype(self):
 
 		'''
 		implicitly favors Content-Type header if set
 		'''
 
 		# neither present
-		if not self.mimetype and 'Content-Type' not in self.headers.keys():
+		if not self.binary.mimetype and 'Content-Type' not in self.headers.keys():
 			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
 		
 		# mimetype, no Content-Type
-		elif self.mimetype and 'Content-Type' not in self.headers.keys():
-			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
-			self.headers['Content-Type'] = self.mimetype
+		elif self.binary.mimetype and 'Content-Type' not in self.headers.keys():
+			logger.debug('setting Content-Type header with provided mimetype: %s' % self.binary.mimetype)
+			self.headers['Content-Type'] = self.binary.mimetype
 
 
-	def _prep_NonRDF_content(self):
+	def _prep_binary_content(self):
 
-		'''
+		'''		
 		favors Content-Location header if set
+		sets delivery method of either payload or header
 		'''
 
 		# nothing present
-		if not self.data and not self.data_location and 'Content-Location' not in self.headers.keys():
-			raise Exception('creating/updating NonRDFSource requires content from self.data, self.ds_location, or the Content-Location header')
+		if not self.binary.data and not self.binary.location and 'Content-Location' not in self.headers.keys():
+			raise Exception('creating/updating NonRDFSource requires content from self.binary.data, self.binary.location, or the Content-Location header')
 
 		elif 'Content-Location' in self.headers.keys():
 			logger.debug('Content-Location header found, using')
-			self.data_type = 'header'
+			self.binary.delivery = 'header'
 		
 		# if Content-Location is not set, look for self.data_location then self.data
 		elif 'Content-Location' not in self.headers.keys():
 
 			# data_location set, trumps Content self.data
-			if self.data_location:
+			if self.binary.location:
 				# set appropriate header
-				self.headers['Content-Location'] = self.data_location
-				self.data_type = 'header'
+				self.headers['Content-Location'] = self.binary.location
+				self.binary.delivery = 'header'
 
 			# data attribute is plain text, binary, or file-like object
-			elif self.data:
+			elif self.binary.data:
 
 				# if file-like object, set flag for api.http_request
-				if isinstance(self.data, io.BufferedIOBase):
+				if isinstance(self.binary.data, io.BufferedIOBase):
 					logger.debug('detected file-like object')
-					self.data_type = 'file'
+					self.binary.delivery = 'payload'
 
 				# else, just bytes
 				else:
 					logger.debug('detected bytes')
-					self.data_type = 'bytes'
+					self.binary.delivery = 'payload'
 
 
 # 'Binary' alias for NonRDFSource
@@ -570,31 +607,6 @@ class RDFResource(Resource):
 		
 		# fire parent Resource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
-
-		# parse RDF
-		if self.exists:
-			self.graph = self.parse_graph()
-
-
-	def parse_graph(self):
-
-		'''
-		use Content-Type from headers to determine parsing method
-		'''
-
-		# handle edge case for content-types not recognized by rdflib parser
-		if self.headers['Content-Type'].startswith('text/plain'):
-			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
-			parse_format = 'application/n-triples'
-		else:
-			parse_format = self.headers['Content-Type']
-
-		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
-		if ';charset' in parse_format:
-			parse_format = parse_format.split(';')[0]
-		
-		# parse and return graph	
-		return rdflib.Graph().parse(data=self.data.decode('utf-8'), format=parse_format)
 
 
 
@@ -619,7 +631,7 @@ class Container(RDFResource):
 		method to return children of this resource
 		'''
 
-		children = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://www.w3.org/ns/ldp#contains'),None))]
+		children = [o for s,p,o in self.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
 
 		# if as_resources, issue GET requests for children and return
 		if as_resources:
@@ -635,7 +647,7 @@ class Container(RDFResource):
 		method to return parent of this resource
 		'''
 
-		parents = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://fedora.info/definitions/v4/repository#hasParent'),None))]
+		parents = [o for s,p,o in self.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
 
 		# if as_resources, issue GET requests for children and return
 		if as_resources:
