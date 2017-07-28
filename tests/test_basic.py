@@ -20,13 +20,6 @@ testing_container_uri = 'testing'
 repo = Repository('http://localhost:8080/rest','ghukill','password', context={'foo':'http://foo.com'})
 
 
-########################################################
-# TEST MEMORY
-########################################################
-class Mem(object):
-	bc_uri = None
-mem = Mem()
-
 
 ########################################################
 # SETUP
@@ -116,7 +109,6 @@ class TestBasicCRUDPUT(object):
 
 
 	# create BasicContainer with NonRDFSource attributes, expect exception
-	
 	def create_resource_type_mismatch(self):
 		
 		'''
@@ -130,6 +122,27 @@ class TestBasicCRUDPUT(object):
 		goober.data = 'this is a test, this is only a test'
 		goober.headers['Content-Type'] = 'text/plain'
 		goober.create(specify_uri=True)
+
+
+
+class TestBinaryUpload(object):
+
+	# upload file-like object
+	def test_file_like_object(self):
+		baz1 = Binary(repo, '%s/foo/baz1' % testing_container_uri)
+		baz1.data = open('README.md','rb')
+		baz1.headers['Content-Type'] = 'text/plain'
+		baz1.create(specify_uri=True)
+		assert baz1.exists
+
+
+	# upload via Content-Location header
+	def test_remote_location(self):
+		baz2 = Binary(repo, '%s/foo/baz2' % testing_container_uri)
+		baz2.data_location = 'https://upload.wikimedia.org/wikipedia/en/d/d3/FremontTroll.jpg'
+		baz2.headers['Content-Type'] = 'image/jpeg'
+		baz2.create(specify_uri=True)
+		assert baz2.exists
 
 
 
