@@ -150,6 +150,7 @@ class API(object):
 			uri,
 			data=None,
 			headers=None,
+			files=None,
 			response_format=None,
 			is_rdf = True
 		):
@@ -186,7 +187,7 @@ class API(object):
 
 		# manually prepare request
 		session = requests.Session()
-		request = requests.Request(verb, uri, data=data, headers=headers)
+		request = requests.Request(verb, uri, data=data, headers=headers, files=files)
 		prepped_request = session.prepare_request(request)
 		response = session.send(prepped_request,
 			stream=False,
@@ -315,15 +316,9 @@ class Resource(object):
 
 		'''
 		when object is created, self.data and self.headers are passed with the requests
-			- when creating NonRDFSource (Binary) type resources, this resource must include 
-			content for self.data and a header value for self.headers['Content-Type']
-
-		URIs and PUT/POST
-			- if uri is present, assume desired uri and use PUT.
-			- if uri absent, assumed repo assigned uri, use POST
 		'''
 
-		# if resource exists, raise exception
+		# if resource claims existence, raise exception
 		if self.exists:
 			raise Exception('resource exists attribute True, aborting')
 
@@ -335,15 +330,24 @@ class Resource(object):
 				verb = 'PUT'
 			else:
 				verb = 'POST'
-			logger.debug('creating resource with %s verb' % verb)
-
-			# check if NonRDF, if so, run _prep_NonRDF_data()
-			if type(self) == NonRDFSource:
-				self._prep_NonRDF_data()
-
-			# fire request
-			response = self.repo.api.http_request(verb, self.uri, self.rdf.data, self.headers)
 			
+			logger.debug('creating resource %s with verb %s' % (self.uri, verb))
+
+			# check if NonRDFSource, if so, run _prep_binary_data() and set data to self.binary.data
+			if type(self) == NonRDFSource:
+				self._prep_binary_data()
+				data = self.binary.data
+			# otherwise, set data as self.rdf.data
+			else:
+				data = self.rdf.data
+			
+			# fire creation request
+			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
+			return self._handle_creation(response, ignore_tombstone)
+			
+
+	def _handle_creation(self, response, ignore_tombstone):
+
 			# 201, success, refresh
 			if response.status_code == 201:
 				# if not specifying uri, capture from response and append to object
@@ -377,6 +381,9 @@ class Resource(object):
 			# unknown status code
 			else:
 				raise Exception('unknown error creating, status code: %s' % response.status_code)
+
+			# if all goes well, return True
+			return True
 
 
 	def delete(self, remove_tombstone=True):
@@ -427,41 +434,55 @@ class Resource(object):
 		'''
 
 		self.status_code = 404
-		self.data = None
 		self.headers = {}
 		self.graph = None
 		self.exists = False
 
+		# recreate rdf data
+		self.rdf = SimpleNamespace()
+		self.rdf.data = None
+		self.rdf.prefixes = RDFPrefixes(self.repo)
 
-		def add_triple(self,spo_tup):
-
-			'''
-			add triple by providing s,p,o
-			'''
-
-
-		def set_triple(self):
-			
-			'''
-			without knowing s,p, or o, set s,p, or o
-			'''
-			pass
-
-
-		def remove_triple(self):
-
-			'''
-			remove triple by supplying s,p,o
-			'''
-			pass
+		# if NonRDF recreate binary data
+		if type(self) == NonRDFSource:
+			# binary data
+			self.binary = SimpleNamespace()
+			self.binary.delivery = None
+			self.binary.data = None
+			self.binary.stream = False
+			self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
+			self.binary.location = None
 
 
-		def modify_triple(self):
+	def add_triple(self,spo_tup):
 
-			'''
-			modify s,p, or o for a triple
-			'''
-			pass
+		'''
+		add triple by providing s,p,o
+		'''
+
+
+	def set_triple(self):
+		
+		'''
+		without knowing s,p, or o, set s,p, or o
+		'''
+		pass
+
+
+	def remove_triple(self):
+
+		'''
+		remove triple by supplying s,p,o
+		'''
+		pass
+
+
+	def modify_triple(self):
+
+		'''
+		modify s,p, or o for a triple
+		'''
+		pass
 
 
 
@@ -490,7 +511,7 @@ class NonRDFSource(Resource):
 		self.binary.location = None
 
 
-	def _prep_NonRDF_data(self):
+	def _prep_binary_data(self):
 
 		'''
 		method is used to check/prep data and headers for NonRDFSource create
@@ -509,13 +530,13 @@ class NonRDFSource(Resource):
 		logger.debug('preparing NonRDFSource data for create/update')
 
 		# handle mimetype / Content-Type
-		self._prep_NonRDF_mimetype()
+		self._prep_binary_mimetype()
 
 		# handle binary data
-		self._prep_NonRDF_content()
+		self._prep_binary_content()
 		
 
-	def _prep_NonRDF_mimetype(self):
+	def _prep_binary_mimetype(self):
 
 		'''
 		implicitly favors Content-Type header if set
@@ -531,10 +552,11 @@ class NonRDFSource(Resource):
 			self.headers['Content-Type'] = self.binary.mimetype
 
 
-	def _prep_NonRDF_content(self):
+	def _prep_binary_content(self):
 
-		'''
+		'''		
 		favors Content-Location header if set
+		sets delivery method of either payload or header
 		'''
 
 		# nothing present
@@ -560,12 +582,12 @@ class NonRDFSource(Resource):
 				# if file-like object, set flag for api.http_request
 				if isinstance(self.binary.data, io.BufferedIOBase):
 					logger.debug('detected file-like object')
-					self.binary.delivery = 'file'
+					self.binary.delivery = 'payload'
 
 				# else, just bytes
 				else:
 					logger.debug('detected bytes')
-					self.binary.delivery = 'bytes'
+					self.binary.delivery = 'payload'
 
 
 # 'Binary' alias for NonRDFSource
@@ -609,7 +631,7 @@ class Container(RDFResource):
 		method to return children of this resource
 		'''
 
-		children = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://www.w3.org/ns/ldp#contains'),None))]
+		children = [o for s,p,o in self.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
 
 		# if as_resources, issue GET requests for children and return
 		if as_resources:
@@ -625,7 +647,7 @@ class Container(RDFResource):
 		method to return parent of this resource
 		'''
 
-		parents = [o for s,p,o in self.graph.triples((None,rdflib.term.URIRef('http://fedora.info/definitions/v4/repository#hasParent'),None))]
+		parents = [o for s,p,o in self.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
 
 		# if as_resources, issue GET requests for children and return
 		if as_resources:

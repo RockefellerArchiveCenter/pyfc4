@@ -29,6 +29,16 @@ class TestSetup(object):
 
 	def test_create_testing_container(self):
 
+		# attempt delete
+		try:
+			response = repo.api.http_request('DELETE', '%s' % testing_container_uri)
+		except:
+			logger.debug("uri %s not found to remove" % testing_container_uri)
+		try:
+			response = repo.api.http_request('DELETE', '%s/fcr:tombstone' % testing_container_uri)
+		except:
+			logger.debug("uri %s tombstone not found to remove" % testing_container_uri)
+
 		tc = BasicContainer(repo, testing_container_uri)
 		tc.create(specify_uri=True)
 		assert tc.exists
@@ -165,7 +175,7 @@ class TestBinaryUpload(object):
 	def test_remote_location(self):
 
 		baz2 = Binary(repo, '%s/foo/baz2' % testing_container_uri)
-		baz2.binary.location = 'https://upload.wikimedia.org/wikipedia/en/d/d3/FremontTroll.jpg'
+		baz2.binary.location = 'http://digital.library.wayne.edu/loris/fedora:wayne:vmc77220%7Cvmc77220_JP2/full/full/0/default.jpg'
 		baz2.binary.mimetype = 'image/jpeg'
 		baz2.create(specify_uri=True)
 		assert baz2.exists

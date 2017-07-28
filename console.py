@@ -30,9 +30,11 @@ def create_demo_resources():
 
 	# baz
 	baz = Binary(repo, 'foo/baz')
-	baz.data = open('README.md','rb')
-	baz.mimetype = 'text/plain'
+	baz.binary.data = open('README.md','rb')
+	baz.binary.mimetype = 'text/plain'
 	baz.create(specify_uri=True)
+
+	return (foo,bar,baz)
 
 
 def delete_dummy_resources():
