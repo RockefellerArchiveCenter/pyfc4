@@ -65,7 +65,7 @@ class Repository(object):
 			self.context.update(context)
 
 		# convenience root resource handle
-		self.root_resource = self.get_resource('')
+		# self.root_resource = self.get_resource('')
 
 
 	def parse_uri(self, uri):
@@ -89,7 +89,7 @@ class Repository(object):
 			else:
 				return rdflib.term.URIRef(uri)
 
-		# already cleaned and URIRef
+		# already cleaned and URIRef type
 		else:
 			return uri
 
@@ -224,29 +224,54 @@ class API(object):
 
 
 
-# Client for reading, writing RDF triples
-class RDFClient(object):
+# # Client for reading, writing RDF triples
+# class RDFClient(object):
 
-	'''
-	Client for adding, writing, reading RDF triples from a resource
-	'''
+# 	'''
+# 	Client for adding, writing, reading RDF triples from a resource
+# 	'''
 	
-	def __init__(self, repo, rdf_prefixes_mixins=None):
+# 	def __init__(self, repo, resource_uri, graph, rdf_prefixes_mixins=None):
 
-		self.repo = repo
-		self.prefixes = RDFPrefixes(repo, rdf_prefixes_mixins)
-
-
-	def add_triple(self):
-		pass
-
-
-	def remove_triple(self):
-		pass
+# 		# attach repo instance with api
+# 		self.repo = repo
+# 		# resource uri
+# 		self.resource_uri = resource_uri
+# 		# graph instance from resource
+# 		self.graph = graph
+# 		# convenience instance of RDFPrefixes
+# 		self.prefixes = RDFPrefixes(repo, rdf_prefixes_mixins)
 
 
-	def modify_triple(self):
-		pass
+# 	def add_triple(self,spo_tup):
+
+# 		'''
+# 		add triple by providing s,p,o
+# 		'''
+
+
+		
+
+# 	def set_triple(self):
+# 		'''
+# 		without knowing s,p, or o, set s,p, or o
+# 		'''
+
+
+# 	def remove_triple(self):
+
+# 		'''
+# 		remove triple by supplying s,p,o
+# 		'''
+# 		pass
+
+
+# 	def modify_triple(self):
+
+# 		'''
+# 		modify s,p, or o for a triple
+# 		'''
+# 		pass
 
 
 
@@ -293,7 +318,7 @@ class Resource(object):
 			self.exists = False
 
 		# RDF Client
-		self.rdf = RDFClient(self.repo, rdf_prefixes_mixins={'goober':'http://tronic#'})
+		self.prefixes = RDFPrefixes(self.repo)
 
 
 	def __repr__(self):
@@ -435,6 +460,37 @@ class Resource(object):
 		self.headers = {}
 		self.graph = None
 		self.exists = False
+
+
+		def add_triple(self,spo_tup):
+
+			'''
+			add triple by providing s,p,o
+			'''
+
+
+		def set_triple(self):
+			
+			'''
+			without knowing s,p, or o, set s,p, or o
+			'''
+			pass
+
+
+		def remove_triple(self):
+
+			'''
+			remove triple by supplying s,p,o
+			'''
+			pass
+
+
+		def modify_triple(self):
+
+			'''
+			modify s,p, or o for a triple
+			'''
+			pass
 
 
 
