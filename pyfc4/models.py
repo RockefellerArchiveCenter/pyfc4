@@ -276,6 +276,10 @@ class Resource(object):
 		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
 
 
+	def uri_as_string(self):
+		return self.uri.toPython()
+
+
 	def check_exists(self):
 		
 		'''
@@ -343,10 +347,10 @@ class Resource(object):
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
-			return self._handle_creation(response, ignore_tombstone)
+			return self._handle_create(response, ignore_tombstone)
 			
 
-	def _handle_creation(self, response, ignore_tombstone):
+	def _handle_create(self, response, ignore_tombstone):
 
 			# 201, success, refresh
 			if response.status_code == 201:
@@ -361,7 +365,7 @@ class Resource(object):
 
 			# 409, conflict, resource likely exists
 			elif response.status_code == 409:
-				raise Exception('status 409 received, resource already exists')
+				raise Exception('resource already exists')
 			
 			# 410, tombstone present
 			elif response.status_code == 410:
