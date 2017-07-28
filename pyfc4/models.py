@@ -5,6 +5,7 @@ import json
 import rdflib
 import rdflib_jsonld
 import requests
+from types import SimpleNamespace
 
 # logging
 import logging
@@ -120,14 +121,8 @@ class Repository(object):
 			resource_type = self.api.parse_resource_type(head_response)
 			logger.debug('using resource type: %s' % resource_type)
 
-			# RDFSource
-			if resource_type != NonRDFSource:
-				# retrieve RDFSource resource
-				get_response = self.api.http_request('GET', uri, response_format=response_format)
-
-			# NonRDFSource, retrieve with proper Content-Type header, and no Accept header
-			else:
-				get_response = self.api.http_request('GET', uri, headers={'Content-Type':head_response.headers['Content-Type']}, is_rdf=False)
+			# fire GET request
+			get_response = self.api.http_request('GET', "%s/fcr:metadata" % uri, response_format=response_format)
 
 			# fire request
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
@@ -255,9 +250,11 @@ class Resource(object):
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
+
 		# parse uri with parse_uri() from repo instance
 		self.uri = self.repo.parse_uri(uri)
-		self.data = data
+		
+		# HTTP
 		self.headers = headers
 		self.status_code = status_code
 		# if status_code provided, and 200, set exists attribute as True
@@ -266,8 +263,12 @@ class Resource(object):
 		else:
 			self.exists = False
 
-		# RDF Client
-		self.prefixes = RDFPrefixes(self.repo)
+		# RDF
+		self.rdf = SimpleNamespace()
+		self.rdf.data = data
+		self.rdf.prefixes = RDFPrefixes(self.repo)
+		if self.exists:
+			self.graph = self.parse_graph()
 
 
 	def __repr__(self):
@@ -287,6 +288,27 @@ class Resource(object):
 		if self.status_code == 404:
 			self.exists = False
 		return self.exists
+
+
+	def parse_graph(self):
+
+		'''
+		use Content-Type from headers to determine parsing method
+		'''
+
+		# handle edge case for content-types not recognized by rdflib parser
+		if self.headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = self.headers['Content-Type']
+
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse and return graph	
+		return rdflib.Graph().parse(data=self.rdf.data.decode('utf-8'), format=parse_format)
 
 
 	def create(self, specify_uri=False, ignore_tombstone=False):
@@ -320,7 +342,7 @@ class Resource(object):
 				self._prep_NonRDF_data()
 
 			# fire request
-			response = self.repo.api.http_request(verb, self.uri, self.data, self.headers)
+			response = self.repo.api.http_request(verb, self.uri, self.rdf.data, self.headers)
 			
 			# 201, success, refresh
 			if response.status_code == 201:
@@ -385,7 +407,7 @@ class Resource(object):
 		if updated_self:
 			# update attributes
 			self.status_code = updated_self.status_code
-			self.data = updated_self.data
+			self.rdf.data = updated_self.rdf.data
 			self.headers = updated_self.headers
 			self.exists = updated_self.exists
 			# update graph if RDFSource
@@ -454,15 +476,18 @@ class NonRDFSource(Resource):
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
 
-		# optional attribute for location of data, trumps .data for create/update
-		self.data_location = None
-		# attribute to note data type
-		self.data_type = None
-		# convenience attribute that is written to headers['Content-Type'] for create/update
 		self.mimetype = None
 
 		# fire parent Resource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+
+		# binary data
+		self.binary = SimpleNamespace()
+		self.binary.delivery = None
+		self.binary.data = None
+		self.binary.stream = False
+		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
+		self.binary.location = None
 
 
 	def _prep_NonRDF_data(self):
@@ -497,13 +522,13 @@ class NonRDFSource(Resource):
 		'''
 
 		# neither present
-		if not self.mimetype and 'Content-Type' not in self.headers.keys():
+		if not self.binary.mimetype and 'Content-Type' not in self.headers.keys():
 			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
 		
 		# mimetype, no Content-Type
-		elif self.mimetype and 'Content-Type' not in self.headers.keys():
-			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
-			self.headers['Content-Type'] = self.mimetype
+		elif self.binary.mimetype and 'Content-Type' not in self.headers.keys():
+			logger.debug('setting Content-Type header with provided mimetype: %s' % self.binary.mimetype)
+			self.headers['Content-Type'] = self.binary.mimetype
 
 
 	def _prep_NonRDF_content(self):
@@ -513,34 +538,34 @@ class NonRDFSource(Resource):
 		'''
 
 		# nothing present
-		if not self.data and not self.data_location and 'Content-Location' not in self.headers.keys():
-			raise Exception('creating/updating NonRDFSource requires content from self.data, self.ds_location, or the Content-Location header')
+		if not self.binary.data and not self.binary.location and 'Content-Location' not in self.headers.keys():
+			raise Exception('creating/updating NonRDFSource requires content from self.binary.data, self.binary.location, or the Content-Location header')
 
 		elif 'Content-Location' in self.headers.keys():
 			logger.debug('Content-Location header found, using')
-			self.data_type = 'header'
+			self.binary.delivery = 'header'
 		
 		# if Content-Location is not set, look for self.data_location then self.data
 		elif 'Content-Location' not in self.headers.keys():
 
 			# data_location set, trumps Content self.data
-			if self.data_location:
+			if self.binary.location:
 				# set appropriate header
-				self.headers['Content-Location'] = self.data_location
-				self.data_type = 'header'
+				self.headers['Content-Location'] = self.binary.location
+				self.binary.delivery = 'header'
 
 			# data attribute is plain text, binary, or file-like object
-			elif self.data:
+			elif self.binary.data:
 
 				# if file-like object, set flag for api.http_request
-				if isinstance(self.data, io.BufferedIOBase):
+				if isinstance(self.binary.data, io.BufferedIOBase):
 					logger.debug('detected file-like object')
-					self.data_type = 'file'
+					self.binary.delivery = 'file'
 
 				# else, just bytes
 				else:
 					logger.debug('detected bytes')
-					self.data_type = 'bytes'
+					self.binary.delivery = 'bytes'
 
 
 # 'Binary' alias for NonRDFSource
@@ -560,31 +585,6 @@ class RDFResource(Resource):
 		
 		# fire parent Resource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
-
-		# parse RDF
-		if self.exists:
-			self.graph = self.parse_graph()
-
-
-	def parse_graph(self):
-
-		'''
-		use Content-Type from headers to determine parsing method
-		'''
-
-		# handle edge case for content-types not recognized by rdflib parser
-		if self.headers['Content-Type'].startswith('text/plain'):
-			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
-			parse_format = 'application/n-triples'
-		else:
-			parse_format = self.headers['Content-Type']
-
-		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
-		if ';charset' in parse_format:
-			parse_format = parse_format.split(';')[0]
-		
-		# parse and return graph	
-		return rdflib.Graph().parse(data=self.data.decode('utf-8'), format=parse_format)
 
 
 

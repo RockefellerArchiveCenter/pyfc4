@@ -96,8 +96,8 @@ class TestBasicCRUDPUT(object):
 	def test_create_child_binary(self):
 
 		baz = Binary(repo, '%s/foo/baz' % testing_container_uri)
-		baz.data = 'this is a test, this is only a test'
-		baz.headers['Content-Type'] = 'text/plain'
+		baz.binary.data = 'this is a test, this is only a test'
+		baz.binary.mimetype = 'text/plain'
 		baz.create(specify_uri=True)
 		assert baz.exists
 
@@ -155,8 +155,8 @@ class TestBinaryUpload(object):
 	def test_file_like_object(self):
 		
 		baz1 = Binary(repo, '%s/foo/baz1' % testing_container_uri)
-		baz1.data = open('README.md','rb')
-		baz1.headers['Content-Type'] = 'text/plain'
+		baz1.binary.data = open('README.md','rb')
+		baz1.binary.mimetype = 'text/plain'
 		baz1.create(specify_uri=True)
 		assert baz1.exists
 
@@ -165,8 +165,8 @@ class TestBinaryUpload(object):
 	def test_remote_location(self):
 
 		baz2 = Binary(repo, '%s/foo/baz2' % testing_container_uri)
-		baz2.data_location = 'https://upload.wikimedia.org/wikipedia/en/d/d3/FremontTroll.jpg'
-		baz2.headers['Content-Type'] = 'image/jpeg'
+		baz2.binary.location = 'https://upload.wikimedia.org/wikipedia/en/d/d3/FremontTroll.jpg'
+		baz2.binary.mimetype = 'image/jpeg'
 		baz2.create(specify_uri=True)
 		assert baz2.exists
 
