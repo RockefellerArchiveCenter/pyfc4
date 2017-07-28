@@ -209,6 +209,50 @@ class API(object):
 
 
 
+# Client for reading, writing RDF triples
+class RDFClient(object):
+
+	'''
+	Client for adding, writing, reading RDF triples from a resource
+	'''
+	
+	def __init__(self, repo, rdf_prefixes_mixins=None):
+
+		self.repo = repo
+		self.prefixes = RDFPrefixes(repo, rdf_prefixes_mixins)
+
+
+	def add_triple(self):
+		pass
+
+
+	def remove_triple(self):
+		pass
+
+
+	def modify_triple(self):
+		pass
+
+
+
+class RDFPrefixes(object):
+
+	'''
+	Small class for taking default contexts from the repository instance
+	'''
+
+	def __init__(self, repo, rdf_prefixes_mixins=None):
+
+		# initiate rdflib namespaces
+		for prefix,uri in repo.context.items():
+			setattr(self, prefix, rdflib.Namespace(uri))
+
+		# include mixins (overwrites repository instance entries where applicable)
+		if rdf_prefixes_mixins:
+			for prefix,uri in rdf_prefixes_mixins.items():
+				setattr(self, prefix, rdflib.Namespace(uri))
+
+
 # Resource
 class Resource(object):
 
@@ -218,7 +262,7 @@ class Resource(object):
 	https://www.w3.org/TR/ldp/
 	'''
 	
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, rdf_prefixes_mixins=None):
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
@@ -236,6 +280,9 @@ class Resource(object):
 			self.exists = True
 		else:
 			self.exists = False
+
+		# RDF Client
+		self.rdf = RDFClient(self.repo, rdf_prefixes_mixins={'goober':'http://tronic#'})
 
 
 	def __repr__(self):
