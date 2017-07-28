@@ -71,21 +71,25 @@ class Repository(object):
 	def parse_uri(self, uri):
 	
 		'''
-		this small helper function parses the short uri from the full uri
-			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
-
-		also accept rdflib.term.URIRef
+		parses and cleans up possible uri inputs, return instance of rdflib.term.URIRef
 		'''
 
-		# URIref, extrac string
-		if type(uri) == rdflib.term.URIRef:
-			return uri.toPython()
+		# no uri provided, assume root
+		if not uri:
+			return rdflib.term.URIRef(self.root)
 
-		# "short" uri, expand with repo.root
-		elif type(uri) == str and not uri.startswith('http'):
-			return "%s%s" % (self.root, uri)
+		# string uri provided
+		elif type(uri) == str:
 
-		# else, assume full uri
+			# assume "short" uri, expand with repo.root
+			if type(uri) == str and not uri.startswith('http'):
+				return rdflib.term.URIRef("%s%s" % (self.root, uri))
+
+			# else, assume full uri
+			else:
+				return rdflib.term.URIRef(uri)
+
+		# already cleaned and URIRef
 		else:
 			return uri
 
@@ -97,13 +101,6 @@ class Repository(object):
 			- issue HEAD request, sniff out content-type to detect NonRDF
 			- issue GET request 
 		'''
-
-		# # check, clean resource
-		# if type(uri) == rdflib.term.URIRef:
-		# 	uri = self.parse_uri(uri)
-		# # if string, and does NOT begin with 'http', assume short uri
-		# elif type(uri) == str and not uri.startswith('http'):
-		# 	uri = self.parse_uri(uri)
 
 		# handle uri
 		uri = self.parse_uri(uri)
@@ -117,7 +114,7 @@ class Repository(object):
 			return False
 
 		# assume exists, parse headers for resource type and return instance
-		else:
+		elif head_response.status_code == 200:
 
 			# parse LDP resource type from headers
 			resource_type = self.api.parse_resource_type(head_response)
@@ -134,6 +131,9 @@ class Repository(object):
 
 			# fire request
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
+
+		else:
+			raise Exception('error retrieving resource uri %s' % uri)
 
 
 
@@ -182,7 +182,11 @@ class API(object):
 				else:
 					headers = {'Accept':response_format}
 
-		# debug
+
+		# prepare uri for HTTP request
+		if type(uri) == rdflib.term.URIRef:
+			uri = uri.toPython()
+
 		logger.debug("%s request for %s, format %s, headers %s" % (verb, uri, response_format, headers))
 
 		# manually prepare request
@@ -277,12 +281,8 @@ class Resource(object):
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
-
-		# handle and parse uri
-		if uri in [None,'/']:
-			self.uri = ''
-		else:
-			self.uri = self.repo.parse_uri(uri)
+		# parse uri with parse_uri() from repo instance
+		self.uri = self.repo.parse_uri(uri)
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
@@ -298,21 +298,6 @@ class Resource(object):
 
 	def __repr__(self):
 		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
-
-
-	def parse_uri(self, uri):
-	
-		'''
-		this small helper function parses the short uri from the full uri
-			e.g. 'http://localhost:8080/rest/foo/bar' --> 'foo/bar'
-
-		also accept rdflib.term.URIRef
-		'''
-
-		if type(uri) == rdflib.term.URIRef:
-			return uri.toPython().split(self.repo.root)[1]
-		elif type(uri) == str:
-			return uri.split(self.repo.root)[1]
 
 
 	def check_exists(self):
@@ -366,7 +351,7 @@ class Resource(object):
 			# 201, success, refresh
 			if response.status_code == 201:
 				# if not specifying uri, capture from response and append to object
-				self.uri = self.parse_uri(response.text)
+				self.uri = self.repo.parse_uri(response.text)
 				# creation successful, update resource
 				self.refresh()
 

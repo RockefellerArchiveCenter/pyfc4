@@ -4,6 +4,7 @@ from pyfc4.models import *
 import inspect
 import pytest
 import rdflib
+import time
 
 # logging
 import logging
@@ -125,10 +126,34 @@ class TestBasicCRUDPUT(object):
 
 
 
+class TestURIParsing(object):
+
+	'''
+	assume 'foo' exists for all
+	'''
+
+	def test_full_uri_string(self):
+		foo = repo.get_resource('http://localhost:8080/rest/%s/foo' % testing_container_uri)
+		assert foo.exists
+
+
+	def test_short_uri_string(self):
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+		assert foo.exists
+
+
+	def test_URIRef_uri(self):
+		foo = repo.get_resource(rdflib.term.URIRef('http://localhost:8080/rest/%s/foo' % testing_container_uri))
+		assert foo.exists
+
+
+
 class TestBinaryUpload(object):
+
 
 	# upload file-like object
 	def test_file_like_object(self):
+		
 		baz1 = Binary(repo, '%s/foo/baz1' % testing_container_uri)
 		baz1.data = open('README.md','rb')
 		baz1.headers['Content-Type'] = 'text/plain'
@@ -138,6 +163,7 @@ class TestBinaryUpload(object):
 
 	# upload via Content-Location header
 	def test_remote_location(self):
+
 		baz2 = Binary(repo, '%s/foo/baz2' % testing_container_uri)
 		baz2.data_location = 'https://upload.wikimedia.org/wikipedia/en/d/d3/FremontTroll.jpg'
 		baz2.headers['Content-Type'] = 'image/jpeg'
@@ -176,7 +202,7 @@ class TestBasicRelationship(object):
 
 class TestBasicCRUDPOST(object):
 
-	# create (basic container)
+	# create, get, and delete POSTed resource
 	def test_bc_crud(self):
 
 		# test create
