@@ -116,7 +116,6 @@ class TestBasicCRUDPUT(object):
 
 
 	# create BasicContainer with NonRDFSource attributes, expect exception
-	
 	def create_resource_type_mismatch(self):
 		
 		'''
@@ -131,6 +130,25 @@ class TestBasicCRUDPUT(object):
 		goober.headers['Content-Type'] = 'text/plain'
 		goober.create(specify_uri=True)
 
+
+class TestBinaryUpload(object):
+
+	# upload file-like object
+	def test_file_like_object(self):
+		baz1 = Binary(repo, '%s/foo/baz1' % testing_container_uri)
+		baz1.data = open('README.md','rb')
+		baz1.headers['Content-Type'] = 'text/plain'
+		baz1.create(specify_uri=True)
+		assert baz1.exists
+
+
+	# upload via Content-Location header
+	def test_file_like_object(self):
+		baz2 = Binary(repo, '%s/foo/baz2' % testing_container_uri)
+		baz2.data_location = 'http://digital.library.wayne.edu/loris/fedora:wayne:EM02_55_143_1%7CEM02a55_143_1d_JP2/full/full/0/default.jpg'
+		baz2.headers['Content-Type'] = 'image/jpeg'
+		baz2.create(specify_uri=True)
+		assert baz2.exists
 
 
 class TestBasicRelationship(object):

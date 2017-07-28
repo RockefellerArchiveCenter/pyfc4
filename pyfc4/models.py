@@ -1,5 +1,6 @@
 # pyfc4
 
+import io
 import json
 import rdflib
 import rdflib_jsonld
@@ -100,7 +101,7 @@ class Repository(object):
 		# HEAD request to detect resource type
 		head_response = self.api.http_request('HEAD', uri)
 
-		# item does not exist, return False
+		# 404, item does not exist, return False
 		if head_response.status_code == 404:
 			logger.debug('resource uri %s not found, returning False' % uri)
 			return False
@@ -116,14 +117,13 @@ class Repository(object):
 			if resource_type != NonRDFSource:
 				# retrieve RDFSource resource
 				get_response = self.api.http_request('GET', uri, response_format=response_format)
+
 			# NonRDFSource, retrieve with proper content negotiation
 			else:
-				get_response = self.api.http_request('GET', uri, response_format=head_response.headers['Content-Type'])
+				get_response = self.api.http_request('GET', uri, headers={'Content-Type':head_response.headers['Content-Type']}, NonRDF=True)
 
 			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
 
-
-	
 
 
 # API
@@ -144,38 +144,40 @@ class API(object):
 			uri,
 			data=None,
 			headers=None,
-			response_format=None
+			response_format=None,
+			NonRDF = False
 		):
 
-		# set content negotiated response format
-		'''
-		Acceptable content negotiated response formats include:
-			application/ld+json
-			application/n-triples
-			application/rdf+xml
-			text/n3 (or text/rdf+n3)
-			text/plain
-			text/turtle (or application/x-turtle)
-		'''
-		# set for GET requests only for now
-		if verb == 'GET':
-			# if no response_format has been requested to this point, use repository instance default
-			if not response_format:
-				response_format = self.repo.default_response_format
-			# if headers present, append
-			if headers and 'Accept' not in headers.keys():
-				headers['Accept'] = response_format
-			# if headers are blank, init dictionary
-			else:
-				headers = {'Accept':response_format}
+		if not NonRDF:
+			# set content negotiated response format for RDFSources
+			'''
+			Acceptable content negotiated response formats include:
+				application/ld+json
+				application/n-triples
+				application/rdf+xml
+				text/n3 (or text/rdf+n3)
+				text/plain
+				text/turtle (or application/x-turtle)
+			'''
+			# set for GET requests only
+			if verb == 'GET':
+				# if no response_format has been requested to this point, use repository instance default
+				if not response_format:
+					response_format = self.repo.default_response_format
+				# if headers present, append
+				if headers and 'Accept' not in headers.keys():
+					headers['Accept'] = response_format
+				# if headers are blank, init dictionary
+				else:
+					headers = {'Accept':response_format}
 
+		# debug
 		logger.debug("%s request for %s, format %s, headers %s" % (verb, uri, response_format, headers))
 
 		# manually prepare request
 		session = requests.Session()
 		request = requests.Request(verb, "%s%s" % (self.repo.root, uri), data=data, headers=headers)
 		prepped_request = session.prepare_request(request)
-
 		response = session.send(prepped_request,
 			stream=False,
 		)
@@ -289,16 +291,16 @@ class Resource(object):
 		# else, continue
 		else:
 
-			# check if NonRDF, if so, run _prep_NonRDF_data()
-			if type(self) == NonRDFSource:
-				self._prep_NonRDF_data()
-
 			# determine verb based on specify_uri parameter
 			if specify_uri:
 				verb = 'PUT'
 			else:
 				verb = 'POST'
 			logger.debug('creating resource with %s verb' % verb)
+
+			# check if NonRDF, if so, run _prep_NonRDF_data()
+			if type(self) == NonRDFSource:
+				self._prep_NonRDF_data()
 
 			# fire request
 			response = self.repo.api.http_request(verb, self.uri, self.data, self.headers)
@@ -336,76 +338,6 @@ class Resource(object):
 			# unknown status code
 			else:
 				raise Exception('unknown error creating, status code: %s' % response.status_code)
-
-
-	def _prep_NonRDF_data(self):
-
-		'''
-		method is used to check/prep data and headers for NonRDFSource create
-
-		This approach from eulfedora might be helpful:
-		# location of content trumps attached content
-		https://github.com/emory-libraries/eulfedora/blob/master/eulfedora/models.py#L361-L367
-		# sending attached content as payload (file-like object)
-		https://github.com/emory-libraries/eulfedora/blob/64eaf999fbff39e809bf1d1da377a972c9685441/eulfedora/api.py#L373-L385
-
-		Also consider external reference per FC4 spec (https://wiki.duraspace.org/display/FEDORA40/RESTful+HTTP+API+-+Containers#RESTfulHTTPAPI-Containers-BluePOSTCreatenewresourceswithinaLDPcontainer):
-		Example (4): Creating a new binary resource at a specified path redirecting to external content
-			curl -X PUT -H"Content-Type: message/external-body; access-type=URL; URL=\"http://www.example.com/file\"" "http://localhost:8080/rest/node/to/create"
-		'''
-
-		logger.debug('preparing NonRDFSource data for create/update')
-
-		# handle mimetype / Content-Type
-		self._prep_NonRDF_mimetype()
-
-		# handle binary data
-		self._prep_NonRDF_content()
-		
-
-	def _prep_NonRDF_mimetype(self):
-
-		'''
-		implicitly favors Content-Type header if set
-		'''
-
-		# neither present
-		if not self.mimetype and 'Content-Type' not in self.headers.keys():
-			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
-		
-		# mimetype, no Content-Type
-		elif self.mimetype and 'Content-Type' not in self.headers.keys():
-			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
-			self.headers['Content-Type'] = self.mimetype
-
-
-	def _prep_NonRDF_content(self):
-
-		'''
-		implicitly favors Content-Location header if set
-
-		alternatively, must handle:
-			1) string / binary
-			2) MAYBE: filepath (likely need flag?)
-				- this one is interesting
-			3) file-like object
-				- want to fire this with `with open()` syntax, so might have to close file, send as path and flag to http_request, then handle there
-			4) http location / uri
-		'''
-
-		# nothing present
-		if not self.data and not self.data_location and 'Content-Location' not in self.headers.keys():
-			raise Exception('creating/updating NonRDFSource requires content from self.data, self.ds_location, or the Content-Location header')
-		
-		elif 'Content-Location' not in self.headers.keys():
-
-			# data_location set, trumps Content self.data
-			if self.data_location:
-				# set appropriate header
-				self.headers['Content-Location'] = self.data_location
-
-			# data attribute is plain text, binary, or file-like object
-			# elif self.data:
 
 
 	def delete(self, remove_tombstone=True):
@@ -476,11 +408,91 @@ class NonRDFSource(Resource):
 
 		# optional attribute for location of data, trumps .data for create/update
 		self.data_location = None
+		# attribute to note data type
+		self.data_type = None
 		# convenience attribute that is written to headers['Content-Type'] for create/update
 		self.mimetype = None
 
 		# fire parent Resource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+
+
+	def _prep_NonRDF_data(self):
+
+		'''
+		method is used to check/prep data and headers for NonRDFSource create
+
+		This approach from eulfedora might be helpful:
+		# location of content trumps attached content
+		https://github.com/emory-libraries/eulfedora/blob/master/eulfedora/models.py#L361-L367
+		# sending attached content as payload (file-like object)
+		https://github.com/emory-libraries/eulfedora/blob/64eaf999fbff39e809bf1d1da377a972c9685441/eulfedora/api.py#L373-L385
+
+		Also consider external reference per FC4 spec (https://wiki.duraspace.org/display/FEDORA40/RESTful+HTTP+API+-+Containers#RESTfulHTTPAPI-Containers-BluePOSTCreatenewresourceswithinaLDPcontainer):
+		Example (4): Creating a new binary resource at a specified path redirecting to external content
+			curl -X PUT -H"Content-Type: message/external-body; access-type=URL; URL=\"http://www.example.com/file\"" "http://localhost:8080/rest/node/to/create"
+		'''
+
+		logger.debug('preparing NonRDFSource data for create/update')
+
+		# handle mimetype / Content-Type
+		self._prep_NonRDF_mimetype()
+
+		# handle binary data
+		self._prep_NonRDF_content()
+		
+
+	def _prep_NonRDF_mimetype(self):
+
+		'''
+		implicitly favors Content-Type header if set
+		'''
+
+		# neither present
+		if not self.mimetype and 'Content-Type' not in self.headers.keys():
+			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
+		
+		# mimetype, no Content-Type
+		elif self.mimetype and 'Content-Type' not in self.headers.keys():
+			logger.debug('setting Content-Type header with provided mimetype: %s' % self.mimetype)
+			self.headers['Content-Type'] = self.mimetype
+
+
+	def _prep_NonRDF_content(self):
+
+		'''
+		favors Content-Location header if set
+		'''
+
+		# nothing present
+		if not self.data and not self.data_location and 'Content-Location' not in self.headers.keys():
+			raise Exception('creating/updating NonRDFSource requires content from self.data, self.ds_location, or the Content-Location header')
+
+		elif 'Content-Location' in self.headers.keys():
+			logger.debug('Content-Location header found, using')
+			self.data_type = 'header'
+		
+		# if Content-Location is not set, look for self.data_location then self.data
+		elif 'Content-Location' not in self.headers.keys():
+
+			# data_location set, trumps Content self.data
+			if self.data_location:
+				# set appropriate header
+				self.headers['Content-Location'] = self.data_location
+				self.data_type = 'header'
+
+			# data attribute is plain text, binary, or file-like object
+			elif self.data:
+
+				# if file-like object, set flag for api.http_request
+				if isinstance(self.data, io.BufferedIOBase):
+					logger.debug('detected file-like object')
+					self.data_type = 'file'
+
+				# else, just bytes
+				else:
+					logger.debug('detected bytes')
+					self.data_type = 'bytes'
 
 
 # 'Binary' alias for NonRDFSource
