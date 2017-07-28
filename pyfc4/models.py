@@ -82,8 +82,12 @@ class Repository(object):
 			return uri.toPython()
 
 		# "short" uri, expand with repo.root
-		elif type(uri) == str:
+		elif type(uri) == str and not uri.startswith('http'):
 			return "%s%s" % (self.root, uri)
+
+		# else, assume full uri
+		else:
+			return uri
 
 
 	def get_resource(self, uri, response_format=None):
@@ -94,12 +98,15 @@ class Repository(object):
 			- issue GET request 
 		'''
 
-		# check, clean resource
-		if type(uri) == rdflib.term.URIRef:
-			uri = self.parse_uri(uri)
-		# if string, and does NOT begin with 'http', assume short uri
-		elif type(uri) == str and not uri.startswith('http'):
-			uri = self.parse_uri(uri)
+		# # check, clean resource
+		# if type(uri) == rdflib.term.URIRef:
+		# 	uri = self.parse_uri(uri)
+		# # if string, and does NOT begin with 'http', assume short uri
+		# elif type(uri) == str and not uri.startswith('http'):
+		# 	uri = self.parse_uri(uri)
+
+		# handle uri
+		uri = self.parse_uri(uri)
 
 		# HEAD request to detect resource type
 		head_response = self.api.http_request('HEAD', uri)
@@ -271,11 +278,11 @@ class Resource(object):
 		# repository handle is pinned to resource instance here
 		self.repo = repo
 
-		# handle edge cases for None or '/' uris
+		# handle and parse uri
 		if uri in [None,'/']:
 			self.uri = ''
 		else:
-			self.uri = uri
+			self.uri = self.repo.parse_uri(uri)
 		self.data = data
 		self.headers = headers
 		self.status_code = status_code
