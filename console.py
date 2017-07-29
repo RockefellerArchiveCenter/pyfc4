@@ -37,7 +37,7 @@ def create_demo_resources():
 	return (foo,bar,baz)
 
 
-def delete_dummy_resources():
+def delete_demo_resources():
 
 	foo = repo.get_resource('foo')
 	foo.delete()

@@ -269,7 +269,7 @@ class Resource(object):
 		self.rdf.data = data
 		self.rdf.prefixes = RDFPrefixes(self.repo)
 		if self.exists:
-			self.graph = self.parse_graph()
+			self.rdf.graph = self.parse_graph()
 
 
 	def __repr__(self):
@@ -423,7 +423,7 @@ class Resource(object):
 			self.exists = updated_self.exists
 			# update graph if RDFSource
 			if type(self) != NonRDFSource:
-				self.graph = updated_self.graph
+				self.rdf.graph = updated_self.rdf.graph
 			# cleanup
 			del(updated_self)
 		else:
@@ -439,13 +439,13 @@ class Resource(object):
 
 		self.status_code = 404
 		self.headers = {}
-		self.graph = None
 		self.exists = False
 
 		# recreate rdf data
 		self.rdf = SimpleNamespace()
 		self.rdf.data = None
 		self.rdf.prefixes = RDFPrefixes(self.repo)
+		self.rdf.graph = None
 
 		# if NonRDF recreate binary data
 		if type(self) == NonRDFSource:
@@ -635,7 +635,7 @@ class Container(RDFResource):
 		method to return children of this resource
 		'''
 
-		children = [o for s,p,o in self.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
+		children = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
 
 		# if as_resources, issue GET requests for children and return
 		if as_resources:
@@ -651,7 +651,7 @@ class Container(RDFResource):
 		method to return parent of this resource
 		'''
 
-		parents = [o for s,p,o in self.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
+		parents = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
 
 		# if as_resources, issue GET requests for children and return
 		if as_resources:
