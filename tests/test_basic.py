@@ -84,7 +84,7 @@ class TestBasicCRUDPUT(object):
 			logger.debug("testing parsing of Content-Type: %s" % content_type)
 			foo = repo.get_resource('%s/foo' % testing_container_uri, response_format=content_type)
 			# test that graph was parsed correctly
-			assert type(foo.graph) == rdflib.graph.Graph
+			assert type(foo.rdf.graph) == rdflib.graph.Graph
 
 
 	# create child container foo/bar (basic container)
