@@ -46,7 +46,7 @@ class Repository(object):
 			username,
 			password,
 			context=None,
-			default_response_format='application/ld+json'
+			default_response_format='application/rdf+xml'
 		):
 
 		self.root = root
