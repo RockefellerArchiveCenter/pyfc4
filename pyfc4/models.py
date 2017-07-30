@@ -269,8 +269,6 @@ class Resource(object):
 		self._build_rdf(data=data)
 
 
-
-
 	def __repr__(self):
 		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
 
@@ -476,7 +474,7 @@ class Resource(object):
 		add triple by providing p,o, assumes s = subject
 		'''
 
-		self.rdf.graph.add(p, o)
+		self.rdf.graph.add((self.uri, p, o))
 
 
 	def set_triple(self):
