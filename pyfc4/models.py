@@ -468,37 +468,45 @@ class Resource(object):
 			self._build_binary()
 
 
+	def _str_to_literal(self, string):
+
+		# if object is string, convert to rdflib.term.Literal
+		if type(string) == str:
+			return rdflib.term.Literal(string)
+		else:
+			return string
+
+
 	def add_triple(self, p, o):
 
 		'''
 		add triple by providing p,o, assumes s = subject
 		'''
 
-		self.rdf.graph.add((self.uri, p, o))
+		self.rdf.graph.add((self.uri, p, self._str_to_literal(o)))
 
 
-	def set_triple(self):
+	def set_triple(self, p, o):
 		
 		'''
 		without knowing s,p, or o, set s,p, or o
 		'''
-		pass
+		
+		self.rdf.graph.set((self.uri, p, self._str_to_literal(o)))
 
 
-	def remove_triple(self):
+	def remove_triple(self, p, o):
 
 		'''
 		remove triple by supplying s,p,o
 		'''
-		pass
+
+		self.rdf.graph.remove((self.uri, p, self._str_to_literal(o)))
 
 
-	def modify_triple(self):
+	def triples(self, s=None, p=None, o=None):
 
-		'''
-		modify s,p, or o for a triple
-		'''
-		pass
+		return self.rdf.graph.triples((s, p, o))
 
 
 	# update RDF, and for NonRDFSource, binaries
