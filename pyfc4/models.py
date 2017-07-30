@@ -149,7 +149,8 @@ class API(object):
 			headers=None,
 			files=None,
 			response_format=None,
-			is_rdf = True
+			is_rdf = True,
+			stream = False
 		):
 
 		# set content negotiated response format for RDFSources
@@ -187,7 +188,7 @@ class API(object):
 		request = requests.Request(verb, uri, data=data, headers=headers, files=files)
 		prepped_request = session.prepare_request(request)
 		response = session.send(prepped_request,
-			stream=False,
+			stream=stream,
 		)
 		return response
 
@@ -512,6 +513,13 @@ class Resource(object):
 		# use PUT to overwrite RDF
 		response = self.repo.api.http_request('PUT', '%s/fcr:metadata' % self.uri, data=self.rdf.graph.serialize(format='turtle'), headers={'Content-Type':'text/turtle'})
 
+		# if NonRDFSource, update binary as well
+		if type(self) == NonRDFSource:
+			logger.debug('###############################################')
+			self._prep_binary_data()
+			binary_data = self.binary.data
+			binary_response = self.repo.api.http_request('PUT', self.uri, data=binary_data, headers={'Content-Type':self.binary.mimetype})
+
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
 			self.refresh()
@@ -545,6 +553,13 @@ class NonRDFSource(Resource):
 		self.binary.stream = False
 		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
 		self.binary.location = None
+		
+		# like RDF, if exists, retrieve binary data
+		if self.exists:
+
+			# get mimetype
+			self.binary.mimetype = self.rdf.graph.value(self.uri, self.rdf.prefixes.ebucore.hasMimeType).toPython()
+			self.binary.data = self.repo.api.http_request('GET', self.uri, data=None, headers={'Content-Type':self.binary.mimetype}, is_rdf=False, stream=True).content
 
 
 	def _prep_binary_data(self):

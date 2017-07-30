@@ -272,8 +272,6 @@ class TestBasicRelationship(object):
 
 
 
-
-
 class TestBasicCRUDPOST(object):
 
 	# create, get, and delete POSTed resource
