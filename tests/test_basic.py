@@ -208,6 +208,70 @@ class TestBasicRelationship(object):
 		for parent in bar.parents(as_resources=True):
 			assert Resource in inspect.getmro(parent.__class__)
 
+	# add triples
+	def test_add_triples(self):
+
+		'''
+		adds multiple dc:subject triples for foo
+		'''
+
+		# get foo
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+
+		# rdflib.term.Literal
+		foo.add_triple(foo.rdf.prefixes.dc.subject, rdflib.term.Literal('windy night'))
+
+		# raw string
+		foo.add_triple(foo.rdf.prefixes.dc.subject, 'stormy seas')
+
+		# update foo
+		foo.update()
+
+		# confirm triples were added
+		for val in ['windy night','stormy seas']:
+			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val)) in foo.rdf.graph
+
+
+	# set triple
+	def test_set_triple(self):
+
+		'''
+		adds dc:title triple, then sets new one, asserts new one
+		'''
+
+		# get foo
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+
+		# add title
+		foo.add_triple(foo.rdf.prefixes.dc.title, 'great american novel')
+		foo.update()
+
+		# set (modify) title
+		foo.set_triple(foo.rdf.prefixes.dc.title, 'one hit wonder')
+		foo.update()
+
+		# assert "one hit wonder"
+		assert (foo.uri, foo.rdf.prefixes.dc.title, rdflib.term.Literal('one hit wonder')) in foo.rdf.graph
+
+
+	# remove triple
+	def test_remove_triple(self):
+
+		'''
+		removes "stormy seas" subject
+		'''
+
+		# get foo
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+
+		# remove triple
+		foo.remove_triple(foo.rdf.prefixes.dc.subject, 'stormy seas')
+		foo.update()
+
+		assert not (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal('stormy seas')) in foo.rdf.graph
+
+
+
 
 
 class TestBasicCRUDPOST(object):

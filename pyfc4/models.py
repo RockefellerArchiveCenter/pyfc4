@@ -238,6 +238,7 @@ class RDFPrefixes(object):
 				setattr(self, prefix, rdflib.Namespace(uri))
 
 
+
 # Resource
 class Resource(object):
 
@@ -265,15 +266,15 @@ class Resource(object):
 			self.exists = False
 
 		# RDF
-		self.rdf = SimpleNamespace()
-		self.rdf.data = data
-		self.rdf.prefixes = RDFPrefixes(self.repo)
-		if self.exists:
-			self.rdf.graph = self.parse_graph()
+		self._build_rdf(data=data)
 
 
 	def __repr__(self):
 		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
+
+
+	def uri_as_string(self):
+		return self.uri.toPython()
 
 
 	def check_exists(self):
@@ -343,10 +344,10 @@ class Resource(object):
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
-			return self._handle_creation(response, ignore_tombstone)
+			return self._handle_create(response, ignore_tombstone)
 			
 
-	def _handle_creation(self, response, ignore_tombstone):
+	def _handle_create(self, response, ignore_tombstone):
 
 			# 201, success, refresh
 			if response.status_code == 201:
@@ -361,7 +362,7 @@ class Resource(object):
 
 			# 409, conflict, resource likely exists
 			elif response.status_code == 409:
-				raise Exception('status 409 received, resource already exists')
+				raise Exception('resource already exists')
 			
 			# 410, tombstone present
 			elif response.status_code == 410:
@@ -427,6 +428,28 @@ class Resource(object):
 			self._empty_resource_attributes()
 			
 
+	def _build_rdf(self, data=None):
+
+		# recreate rdf data
+		self.rdf = SimpleNamespace()
+		self.rdf.data = data
+		self.rdf.prefixes = RDFPrefixes(self.repo)
+		self.rdf.graph = None
+		if self.exists:
+			self.rdf.graph = self.parse_graph()
+
+
+	def _build_binary(self):
+
+		# binary data
+		self.binary = SimpleNamespace()
+		self.binary.delivery = None
+		self.binary.data = None
+		self.binary.stream = False
+		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
+		self.binary.location = None
+
+
 	def _empty_resource_attributes(self):
 
 		'''
@@ -437,51 +460,67 @@ class Resource(object):
 		self.headers = {}
 		self.exists = False
 
-		# recreate rdf data
-		self.rdf = SimpleNamespace()
-		self.rdf.data = None
-		self.rdf.prefixes = RDFPrefixes(self.repo)
-		self.rdf.graph = None
+		# build RDF
+		self.rdf = self._build_rdf()
 
 		# if NonRDF recreate binary data
 		if type(self) == NonRDFSource:
-			# binary data
-			self.binary = SimpleNamespace()
-			self.binary.delivery = None
-			self.binary.data = None
-			self.binary.stream = False
-			self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
-			self.binary.location = None
+			self._build_binary()
 
 
-	def add_triple(self,spo_tup):
+	def _str_to_literal(self, string):
+
+		# if object is string, convert to rdflib.term.Literal
+		if type(string) == str:
+			return rdflib.term.Literal(string)
+		else:
+			return string
+
+
+	def add_triple(self, p, o):
 
 		'''
-		add triple by providing s,p,o
+		add triple by providing p,o, assumes s = subject
 		'''
 
+		self.rdf.graph.add((self.uri, p, self._str_to_literal(o)))
 
-	def set_triple(self):
+
+	def set_triple(self, p, o):
 		
 		'''
 		without knowing s,p, or o, set s,p, or o
 		'''
-		pass
+		
+		self.rdf.graph.set((self.uri, p, self._str_to_literal(o)))
 
 
-	def remove_triple(self):
+	def remove_triple(self, p, o):
 
 		'''
 		remove triple by supplying s,p,o
 		'''
-		pass
+
+		self.rdf.graph.remove((self.uri, p, self._str_to_literal(o)))
 
 
-	def modify_triple(self):
+	def triples(self, s=None, p=None, o=None):
 
-		'''
-		modify s,p, or o for a triple
-		'''
+		return self.rdf.graph.triples((s, p, o))
+
+
+	# update RDF, and for NonRDFSource, binaries
+	def update(self):
+
+		# use PUT to overwrite RDF
+		response = self.repo.api.http_request('PUT', '%s/fcr:metadata' % self.uri, data=self.rdf.graph.serialize(format='turtle'), headers={'Content-Type':'text/turtle'})
+
+		# if status_code == 204, resource changed, refresh graph
+		if response.status_code == 204:
+			self.refresh()
+
+
+	def patch(self, sparql_query):
 		pass
 
 
