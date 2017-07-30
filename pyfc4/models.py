@@ -46,7 +46,7 @@ class Repository(object):
 			username,
 			password,
 			context=None,
-			default_response_format='application/rdf+xml'
+			default_response_format='text/turtle'
 		):
 
 		self.root = root
@@ -64,9 +64,6 @@ class Repository(object):
 		if context:
 			logger.debug('context provided, merging with defaults')
 			self.context.update(context)
-
-		# convenience root resource handle
-		# self.root_resource = self.get_resource('')
 
 
 	def parse_uri(self, uri):
