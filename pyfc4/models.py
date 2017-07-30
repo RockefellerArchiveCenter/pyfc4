@@ -238,6 +238,7 @@ class RDFPrefixes(object):
 				setattr(self, prefix, rdflib.Namespace(uri))
 
 
+
 # Resource
 class Resource(object):
 
@@ -265,11 +266,9 @@ class Resource(object):
 			self.exists = False
 
 		# RDF
-		self.rdf = SimpleNamespace()
-		self.rdf.data = data
-		self.rdf.prefixes = RDFPrefixes(self.repo)
-		if self.exists:
-			self.rdf.graph = self.parse_graph()
+		self._build_rdf(data=data)
+
+
 
 
 	def __repr__(self):
@@ -431,6 +430,28 @@ class Resource(object):
 			self._empty_resource_attributes()
 			
 
+	def _build_rdf(self, data=None):
+
+		# recreate rdf data
+		self.rdf = SimpleNamespace()
+		self.rdf.data = data
+		self.rdf.prefixes = RDFPrefixes(self.repo)
+		self.rdf.graph = None
+		if self.exists:
+			self.rdf.graph = self.parse_graph()
+
+
+	def _build_binary(self):
+
+		# binary data
+		self.binary = SimpleNamespace()
+		self.binary.delivery = None
+		self.binary.data = None
+		self.binary.stream = False
+		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
+		self.binary.location = None
+
+
 	def _empty_resource_attributes(self):
 
 		'''
@@ -441,28 +462,21 @@ class Resource(object):
 		self.headers = {}
 		self.exists = False
 
-		# recreate rdf data
-		self.rdf = SimpleNamespace()
-		self.rdf.data = None
-		self.rdf.prefixes = RDFPrefixes(self.repo)
-		self.rdf.graph = None
+		# build RDF
+		self.rdf = self._build_rdf()
 
 		# if NonRDF recreate binary data
 		if type(self) == NonRDFSource:
-			# binary data
-			self.binary = SimpleNamespace()
-			self.binary.delivery = None
-			self.binary.data = None
-			self.binary.stream = False
-			self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
-			self.binary.location = None
+			self._build_binary()
 
 
-	def add_triple(self,spo_tup):
+	def add_triple(self, p, o):
 
 		'''
-		add triple by providing s,p,o
+		add triple by providing p,o, assumes s = subject
 		'''
+
+		self.rdf.graph.add(p, o)
 
 
 	def set_triple(self):
@@ -486,6 +500,21 @@ class Resource(object):
 		'''
 		modify s,p, or o for a triple
 		'''
+		pass
+
+
+	# update RDF, and for NonRDFSource, binaries
+	def update(self):
+
+		# use PUT to overwrite RDF
+		response = self.repo.api.http_request('PUT', '%s/fcr:metadata' % self.uri, data=self.rdf.graph.serialize(format='turtle'), headers={'Content-Type':'text/turtle'})
+
+		# if status_code == 204, resource changed, refresh graph
+		if response.status_code == 204:
+			self.refresh()
+
+
+	def patch(self, sparql_query):
 		pass
 
 
