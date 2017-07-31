@@ -229,7 +229,7 @@ class TestBasicRelationship(object):
 
 		# confirm triples were added
 		for val in ['windy night','stormy seas']:
-			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val)) in foo.rdf.graph
+			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val, datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))) in foo.rdf.graph
 
 
 	# set triple
@@ -251,7 +251,7 @@ class TestBasicRelationship(object):
 		foo.update()
 
 		# assert "one hit wonder"
-		assert (foo.uri, foo.rdf.prefixes.dc.title, rdflib.term.Literal('one hit wonder')) in foo.rdf.graph
+		assert (foo.uri, foo.rdf.prefixes.dc.title, rdflib.term.Literal('one hit wonder', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))) in foo.rdf.graph
 
 
 	# remove triple
@@ -269,8 +269,6 @@ class TestBasicRelationship(object):
 		foo.update()
 
 		assert not (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal('stormy seas')) in foo.rdf.graph
-
-
 
 
 

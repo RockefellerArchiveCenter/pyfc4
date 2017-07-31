@@ -1,8 +1,11 @@
 # pyfc4
 
+import copy
+import datetime
 import io
 import json
 import rdflib
+from rdflib.compare import to_isomorphic, graph_diff
 import rdflib_jsonld
 import requests
 from types import SimpleNamespace
@@ -18,10 +21,10 @@ logger.setLevel(logging.DEBUG)
 class Repository(object):
 	
 	'''
-	Class for Fedora Commons 4, LDP server instance
+	Class for Fedora Commons 4 (FC4), LDP server instance
 	'''
 
-	# establish namespace context
+	# provide some default namespaces for graph binding
 	context = {
 		'premis':'http://www.loc.gov/premis/rdf/v1#',
 		'test':'info:fedora/test/',
@@ -46,7 +49,7 @@ class Repository(object):
 			username,
 			password,
 			context=None,
-			default_response_format='application/ld+json'
+			default_response_format='text/turtle'
 		):
 
 		self.root = root
@@ -64,9 +67,6 @@ class Repository(object):
 		if context:
 			logger.debug('context provided, merging with defaults')
 			self.context.update(context)
-
-		# convenience root resource handle
-		# self.root_resource = self.get_resource('')
 
 
 	def parse_uri(self, uri):
@@ -152,14 +152,15 @@ class API(object):
 			headers=None,
 			files=None,
 			response_format=None,
-			is_rdf = True
+			is_rdf = True,
+			stream = False
 		):
 
 		# set content negotiated response format for RDFSources
 		if is_rdf:
 			'''
 			Acceptable content negotiated response formats include:
-				application/ld+json
+				application/ld+json (discouraged, if not prohibited, as it drops prefixes used in repository)
 				application/n-triples
 				application/rdf+xml
 				text/n3 (or text/rdf+n3)
@@ -178,7 +179,6 @@ class API(object):
 				else:
 					headers = {'Accept':response_format}
 
-
 		# prepare uri for HTTP request
 		if type(uri) == rdflib.term.URIRef:
 			uri = uri.toPython()
@@ -190,7 +190,7 @@ class API(object):
 		request = requests.Request(verb, uri, data=data, headers=headers, files=files)
 		prepped_request = session.prepare_request(request)
 		response = session.send(prepped_request,
-			stream=False,
+			stream=stream,
 		)
 		return response
 
@@ -220,22 +220,65 @@ class API(object):
 
 
 
-class RDFPrefixes(object):
+class SparqlUpdate(object):
 
 	'''
-	Small class for taking default contexts from the repository instance
+	class to handle the creation of Sparql updates via PATCH request
 	'''
 
-	def __init__(self, repo, rdf_prefixes_mixins=None):
+	def __init__(self, prefixes, diffs):
 
-		# initiate rdflib namespaces
-		for prefix,uri in repo.context.items():
-			setattr(self, prefix, rdflib.Namespace(uri))
+		self.prefixes = prefixes
+		self.diffs = diffs
 
-		# include mixins (overwrites repository instance entries where applicable)
-		if rdf_prefixes_mixins:
-			for prefix,uri in rdf_prefixes_mixins.items():
-				setattr(self, prefix, rdflib.Namespace(uri))
+		# prefixes and namespaces
+		self.update_namespaces = set()
+		self.update_prefixes = {}
+
+	
+	def _derive_namespaces(self):
+
+		# iterate through graphs and get unique namespace uris
+		for graph in [self.diffs.overlap, self.diffs.removed, self.diffs.added]:
+			for s,p,o in graph:
+				ns_prefix, ns_uri, predicate = graph.compute_qname(p)
+				self.update_namespaces.add(ns_uri)
+		logger.debug(self.update_namespaces)
+
+		# build unique prefixes dictionary
+		for ns_uri in self.update_namespaces:
+			for k in self.prefixes.__dict__:
+				if str(ns_uri) == str(self.prefixes.__dict__[k]):
+					logger.debug('adding prefix %s for uri %s to unique_prefixes' % (k,str(ns_uri)))
+					self.update_prefixes[k] = self.prefixes.__dict__[k]
+
+
+	def build_query(self):
+
+		# derive namespaces to include prefixes in Sparql update query
+		self._derive_namespaces()
+
+		q = ''
+
+		# add prefixes
+		for ns_prefix, ns_uri in self.update_prefixes.items():
+			q += "PREFIX %s: <%s>\n" % (ns_prefix, str(ns_uri))
+
+		# deletes
+		removed_serialized = self.diffs.removed.serialize(format='nt').decode('utf-8')
+		q += '\nDELETE {\n%s}\n\n' % removed_serialized
+
+		# inserts
+		added_serialized = self.diffs.added.serialize(format='nt').decode('utf-8')
+		q += '\nINSERT {\n%s}\n\n' % added_serialized
+
+		# where (not yet implemented)
+		q += 'WHERE {}'
+
+		# debug
+		logger.debug(q)
+
+		return q
 
 
 
@@ -290,27 +333,6 @@ class Resource(object):
 		if self.status_code == 404:
 			self.exists = False
 		return self.exists
-
-
-	def parse_graph(self):
-
-		'''
-		use Content-Type from headers to determine parsing method
-		'''
-
-		# handle edge case for content-types not recognized by rdflib parser
-		if self.headers['Content-Type'].startswith('text/plain'):
-			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
-			parse_format = 'application/n-triples'
-		else:
-			parse_format = self.headers['Content-Type']
-
-		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
-		if ';charset' in parse_format:
-			parse_format = parse_format.split(';')[0]
-		
-		# parse and return graph	
-		return rdflib.Graph().parse(data=self.rdf.data.decode('utf-8'), format=parse_format)
 
 
 	def create(self, specify_uri=False, ignore_tombstone=False):
@@ -420,7 +442,7 @@ class Resource(object):
 			self.exists = updated_self.exists
 			# update graph if RDFSource
 			if type(self) != NonRDFSource:
-				self.rdf.graph = updated_self.rdf.graph
+				self._parse_graph()
 			# cleanup
 			del(updated_self)
 		else:
@@ -430,13 +452,86 @@ class Resource(object):
 
 	def _build_rdf(self, data=None):
 
+		'''
+		parse incoming rdf as self.rdf.orig_graph, create copy at self.rdf.graph
+		'''
+
 		# recreate rdf data
 		self.rdf = SimpleNamespace()
 		self.rdf.data = data
-		self.rdf.prefixes = RDFPrefixes(self.repo)
-		self.rdf.graph = None
+		self.rdf.prefixes = SimpleNamespace()
+		# populate prefixes
+		for prefix,uri in self.repo.context.items():
+			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
 		if self.exists:
-			self.rdf.graph = self.parse_graph()
+			self._parse_graph()
+
+
+	def _parse_graph(self):
+
+		'''
+		use Content-Type from headers to determine parsing method
+		'''
+
+		# handle edge case for content-types not recognized by rdflib parser
+		if self.headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = self.headers['Content-Type']
+
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse graph	
+		self.rdf.graph = rdflib.Graph().parse(data=self.rdf.data.decode('utf-8'), format=parse_format)
+
+		# bind any additional namespaces from repo instance, but do not override
+		self.rdf.namespace_manager = rdflib.namespace.NamespaceManager(self.rdf.graph)
+		for ns_prefix, ns_uri in self.rdf.prefixes.__dict__.items():
+			self.rdf.namespace_manager.bind(ns_prefix, ns_uri, override=False)
+
+		# conversely, add namespaces from parsed graph to self.rdf.prefixes
+		for ns_prefix, ns_uri in self.rdf.graph.namespaces():
+			setattr(self.rdf.prefixes, ns_prefix, rdflib.Namespace(ns_uri))
+
+		# pin old graph to resource, create copy graph for modifications
+		self.rdf._orig_graph = copy.deepcopy(self.rdf.graph)
+
+
+	def _diff_graph(self):
+
+		'''
+		using rdflib.compare diff, https://github.com/RDFLib/rdflib/blob/master/rdflib/compare.py
+			- determine triples to add, remove, modify
+		'''
+
+		overlap, removed, added = graph_diff(to_isomorphic(self.rdf._orig_graph), to_isomorphic(self.rdf.graph))
+		diffs = SimpleNamespace()
+		diffs.overlap = overlap
+		diffs.removed = removed
+		diffs.added = added
+		self.rdf.diffs = diffs
+
+
+	def add_namespace(self, ns_prefix, ns_uri):
+
+		'''
+		preferred method is to instantiate with repository under 'context',
+		but prefixes / namespaces can be added for a Resource instance
+
+		adds to self.rdf.prefixes which will endure through create/update/refresh,
+		and get added back to parsed graph namespaces
+
+		EXPECTS: string namespace prefix, string namespace uri
+		'''
+
+		# add to prefixes
+		setattr(self.rdf.prefixes, ns_prefix, rdflib.Namespace(ns_uri))
+
+		# bind to graph
+		self.rdf.namespace_manager.bind(ns_prefix, ns_uri, override=False)
 
 
 	def _build_binary(self):
@@ -468,13 +563,26 @@ class Resource(object):
 			self._build_binary()
 
 
-	def _str_to_literal(self, string):
+	def _handle_object(self, object_input):
 
-		# if object is string, convert to rdflib.term.Literal
-		if type(string) == str:
-			return rdflib.term.Literal(string)
+		# if object is string, convert to rdflib.term.Literal with appropriate datatype
+		if type(object_input) == str:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.string)
+
+		# integer
+		elif type(object_input) == int:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.int)
+
+		# float
+		elif type(object_input) == float:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.float)
+
+		# date
+		elif type(object_input) == datetime.datetime:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.date)
+
 		else:
-			return string
+			return object_input
 
 
 	def add_triple(self, p, o):
@@ -483,7 +591,7 @@ class Resource(object):
 		add triple by providing p,o, assumes s = subject
 		'''
 
-		self.rdf.graph.add((self.uri, p, self._str_to_literal(o)))
+		self.rdf.graph.add((self.uri, p, self._handle_object(o)))
 
 
 	def set_triple(self, p, o):
@@ -492,7 +600,7 @@ class Resource(object):
 		without knowing s,p, or o, set s,p, or o
 		'''
 		
-		self.rdf.graph.set((self.uri, p, self._str_to_literal(o)))
+		self.rdf.graph.set((self.uri, p, self._handle_object(o)))
 
 
 	def remove_triple(self, p, o):
@@ -501,7 +609,7 @@ class Resource(object):
 		remove triple by supplying s,p,o
 		'''
 
-		self.rdf.graph.remove((self.uri, p, self._str_to_literal(o)))
+		self.rdf.graph.remove((self.uri, p, self._handle_object(o)))
 
 
 	def triples(self, s=None, p=None, o=None):
@@ -510,18 +618,31 @@ class Resource(object):
 
 
 	# update RDF, and for NonRDFSource, binaries
-	def update(self):
+	def update(self, sparql_query_only=False):
 
-		# use PUT to overwrite RDF
-		response = self.repo.api.http_request('PUT', '%s/fcr:metadata' % self.uri, data=self.rdf.graph.serialize(format='turtle'), headers={'Content-Type':'text/turtle'})
+		'''
+		reworking...
+
+			- PUT requests were not appropriate for updates to RDF
+			- PATCH requests will be more fitting, but will need to queue up changes, then submit as SparqlPatch query
+		'''
+
+		# run diff on graphs, send as PATCH request
+		self._diff_graph()		
+		sq = SparqlUpdate(self.rdf.prefixes, self.rdf.diffs)
+		if sparql_query_only:
+			return sq.build_query()
+		response = self.repo.api.http_request('PATCH', self.uri, data=sq.build_query(), headers={'Content-Type':'application/sparql-update'})
+
+		# if NonRDFSource, update binary as well
+		if type(self) == NonRDFSource:
+			self._prep_binary_data()
+			binary_data = self.binary.data
+			binary_response = self.repo.api.http_request('PUT', self.uri, data=binary_data, headers={'Content-Type':self.binary.mimetype})
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
 			self.refresh()
-
-
-	def patch(self, sparql_query):
-		pass
 
 
 
@@ -548,6 +669,13 @@ class NonRDFSource(Resource):
 		self.binary.stream = False
 		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
 		self.binary.location = None
+		
+		# like RDF, if exists, retrieve binary data
+		if self.exists:
+
+			# get mimetype
+			self.binary.mimetype = self.rdf.graph.value(self.uri, self.rdf.prefixes.ebucore.hasMimeType).toPython()
+			self.binary.data = self.repo.api.http_request('GET', self.uri, data=None, headers={'Content-Type':self.binary.mimetype}, is_rdf=False, stream=True).content
 
 
 	def _prep_binary_data(self):
