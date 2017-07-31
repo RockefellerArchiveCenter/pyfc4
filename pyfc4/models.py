@@ -218,6 +218,69 @@ class API(object):
 			return False
 
 
+
+class SparqlUpdate(object):
+
+	'''
+	class to handle the creation of Sparql updates via PATCH request
+	'''
+
+	def __init__(self, prefixes, diffs):
+
+		self.prefixes = prefixes
+		self.diffs = diffs
+
+		# prefixes and namespaces
+		self.update_namespaces = set()
+		self.update_prefixes = {}
+
+	
+	def derive_namespaces(self):
+
+		# iterate through graphs and get unique namespace uris
+		for graph in [self.diffs.overlap, self.diffs.removed, self.diffs.added]:
+			for s,p,o in graph:
+				ns_prefix, ns_uri, predicate = graph.compute_qname(p)
+				self.update_namespaces.add(ns_uri)
+		logger.debug(self.update_namespaces)
+
+		# build unique prefixes dictionary
+		for ns_uri in self.update_namespaces:
+			for k in self.prefixes.__dict__:
+				if str(ns_uri) == str(self.prefixes.__dict__[k]):
+					logger.debug('adding prefix %s for uri %s to unique_prefixes' % (k,str(ns_uri)))
+					self.update_prefixes[k] = self.prefixes.__dict__[k]
+
+
+	def build_query(self):
+
+		# derive namespaces to include prefixes in Sparql update query
+		self.derive_namespaces()
+
+		q = ''
+
+		# add prefixes
+		for ns_prefix, ns_uri in self.update_prefixes.items():
+			q += "PREFIX %s: <%s>\n" % (ns_prefix, str(ns_uri))
+
+		# deletes
+		removed_serialized = self.diffs.removed.serialize(format='nt').decode('utf-8')
+		q += '\nDELETE {\n%s}\n\n' % removed_serialized
+
+		# inserts
+		added_serialized = self.diffs.added.serialize(format='nt').decode('utf-8')
+		q += '\nINSERT {\n%s}\n\n' % added_serialized
+
+		# where (not yet implemented)
+		q += 'WHERE {}'
+
+		# debug
+		logger.debug(q)
+
+		return q
+
+
+
 # Resource
 class Resource(object):
 
@@ -443,11 +506,11 @@ class Resource(object):
 			- determine triples to add, remove, modify
 		'''
 
-		overlap, removed, new = graph_diff(to_isomorphic(self.rdf._orig_graph), to_isomorphic(self.rdf.graph))
+		overlap, removed, added = graph_diff(to_isomorphic(self.rdf._orig_graph), to_isomorphic(self.rdf.graph))
 		diffs = SimpleNamespace()
 		diffs.overlap = overlap
-		diffs.remove = removed
-		diffs.new = new
+		diffs.removed = removed
+		diffs.added = added
 		self.rdf.diffs = diffs
 
 
@@ -557,8 +620,10 @@ class Resource(object):
 			- PATCH requests will be more fitting, but will need to queue up changes, then submit as SparqlPatch query
 		'''
 
-		# # use PUT to overwrite RDF
-		# response = self.repo.api.http_request('PUT', '%s/fcr:metadata' % self.uri, data=self.rdf.graph.serialize(format='turtle'), headers={'Content-Type':'text/turtle'})
+		# run diff on graphs, send as PATCH request
+		self._diff_graph()		
+		sq = SparqlUpdate(self.rdf.prefixes, self.rdf.diffs)
+		response = self.repo.api.http_request('PATCH', self.uri, data=sq.build_query(), headers={'Content-Type':'application/sparql-update'})
 
 		# # if NonRDFSource, update binary as well
 		# if type(self) == NonRDFSource:
@@ -566,9 +631,9 @@ class Resource(object):
 		# 	binary_data = self.binary.data
 		# 	binary_response = self.repo.api.http_request('PUT', self.uri, data=binary_data, headers={'Content-Type':self.binary.mimetype})
 
-		# # if status_code == 204, resource changed, refresh graph
-		# if response.status_code == 204:
-		# 	self.refresh()
+		# if status_code == 204, resource changed, refresh graph
+		if response.status_code == 204:
+			self.refresh()
 
 
 
