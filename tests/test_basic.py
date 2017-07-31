@@ -1,6 +1,7 @@
 
 from pyfc4.models import *
 
+import datetime
 import inspect
 import pytest
 import rdflib
@@ -269,6 +270,23 @@ class TestBasicRelationship(object):
 		foo.update()
 
 		assert not (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal('stormy seas')) in foo.rdf.graph
+
+
+	# RDF types
+	def test_rdf_types(self):
+
+		# string
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+		foo.add_triple(foo.rdf.prefixes.test.string_typing, 'string here, move along')
+		assert next(foo.rdf.graph.objects(None, foo.rdf.prefixes.test.string_typing)).datatype == rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string')
+
+		# int
+		foo.add_triple(foo.rdf.prefixes.test.integer_typing, 42)
+		assert next(foo.rdf.graph.objects(None, foo.rdf.prefixes.test.integer_typing)).datatype == rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#int')
+
+		# date
+		foo.add_triple(foo.rdf.prefixes.test.date_typing, datetime.datetime.now())
+		assert next(foo.rdf.graph.objects(None, foo.rdf.prefixes.test.date_typing)).datatype == rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#date')
 
 
 
