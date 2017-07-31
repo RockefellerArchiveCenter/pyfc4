@@ -185,7 +185,7 @@ foo.add_triple(foo.rdf.prefixes.dc.subject, 'minty')
 foo.add_triple(foo.rdf.prefixes.foaf.knows, bar.uri)
 ```
 
-To commit these modifications to the resource's graph, use the method `.update`.  This sends the updated graph as a `PUT` request, then retrieves the updated graph and sets that to the resource instance.
+To commit these modifications to the resource's graph, use the method `.update`.  This sends the updated graph as a `PATCH` request, then retrieves the updated graph and sets that to the resource instance.
 
 ```
 foo.update()
