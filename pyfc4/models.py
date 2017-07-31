@@ -1,6 +1,7 @@
 # pyfc4
 
 import copy
+import datetime
 import io
 import json
 import rdflib
@@ -562,27 +563,26 @@ class Resource(object):
 			self._build_binary()
 
 
-	def _handle_object(self, string):
+	def _handle_object(self, object_input):
 
 		# if object is string, convert to rdflib.term.Literal with appropriate datatype
-		if type(string) == str:
-			return rdflib.term.Literal(string, datatype=rdflib.XSD.string)
+		if type(object_input) == str:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.string)
 
 		# integer
+		elif type(object_input) == int:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.int)
+
+		# float
+		elif type(object_input) == float:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.float)
 
 		# date
-
-		# other?
+		elif type(object_input) == datetime.datetime:
+			return rdflib.term.Literal(object_input, datatype=rdflib.XSD.date)
 
 		else:
-			return string
-
-
-
-	'''
-	Reworking the modification of triples, moving to PATCH
-	'''
-
+			return object_input
 
 
 	def add_triple(self, p, o):
