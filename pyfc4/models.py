@@ -611,7 +611,7 @@ class Resource(object):
 
 
 	# update RDF, and for NonRDFSource, binaries
-	def update(self):
+	def update(self, return_query_only=False):
 
 		'''
 		reworking...
@@ -623,13 +623,15 @@ class Resource(object):
 		# run diff on graphs, send as PATCH request
 		self._diff_graph()		
 		sq = SparqlUpdate(self.rdf.prefixes, self.rdf.diffs)
+		if return_query_only:
+			return sq.build_query()
 		response = self.repo.api.http_request('PATCH', self.uri, data=sq.build_query(), headers={'Content-Type':'application/sparql-update'})
 
-		# # if NonRDFSource, update binary as well
-		# if type(self) == NonRDFSource:
-		# 	self._prep_binary_data()
-		# 	binary_data = self.binary.data
-		# 	binary_response = self.repo.api.http_request('PUT', self.uri, data=binary_data, headers={'Content-Type':self.binary.mimetype})
+		# if NonRDFSource, update binary as well
+		if type(self) == NonRDFSource:
+			self._prep_binary_data()
+			binary_data = self.binary.data
+			binary_response = self.repo.api.http_request('PUT', self.uri, data=binary_data, headers={'Content-Type':self.binary.mimetype})
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
