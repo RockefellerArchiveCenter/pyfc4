@@ -9,6 +9,7 @@ setup(name='pyfc4',
       license='Apache License, Version 2.0',
       install_requires=[
       	'pytest',
+            'pytest-cov',
       	'rdflib',
       	'rdflib-jsonld',
       	'requests'

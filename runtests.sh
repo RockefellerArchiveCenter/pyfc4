@@ -1,1 +1,1 @@
-pytest --capture=no
+pytest --capture=no --cov=pyfc4
