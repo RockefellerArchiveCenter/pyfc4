@@ -51,6 +51,27 @@ class TestSetup(object):
 
 class TestBasicCRUDPUT(object):
 
+	# test get root
+	def test_get_root_and_helpers(self):
+
+		# get root node
+		root = repo.get_resource(None)
+		assert root.exists
+
+		# test __repr__
+		assert root.__repr__() == '<BasicContainer Resource, uri: %s>' % repo.root
+
+		# test uri_as_string
+		assert root.uri_as_string() == repo.root
+
+
+	# test bad uri
+	def test_bad_uri(self):
+
+		with pytest.raises(Exception) as excinfo:
+			repo.get_resource('*%($')
+		assert 'error retrieving resource' in str(excinfo.value)	
+
 	
 	# create foo (basic container)
 	def test_create_bc(self):
@@ -103,6 +124,30 @@ class TestBasicCRUDPUT(object):
 		assert bar.exists
 
 
+	# create child, retrieve, delete, confirm with check_exists()
+	def test_resource_existence(self):
+
+		# create temp child resource
+		tronic = BasicContainer(repo, '%s/foo/tronic' % testing_container_uri)
+		tronic.create(specify_uri=True)
+		assert tronic.check_exists()
+
+		# attempt to recreate
+		tronic_clone = BasicContainer(repo, '%s/foo/tronic' % testing_container_uri)
+		with pytest.raises(Exception) as excinfo:
+			tronic.create(specify_uri=True)
+		assert 'resource exists attribute True' in str(excinfo.value)
+
+		# delete tronic
+		tronic_removal = repo.get_resource('%s/foo/tronic' % testing_container_uri)
+		tronic_removal.delete()
+		assert not tronic_removal.exists
+
+		# confirm check_exists() updates resource instance
+		tronic.check_exists()
+		assert not tronic.exists
+
+
 	# create foo/baz (NonRDF / binary), from foo
 	def test_create_child_binary(self):
 
@@ -134,6 +179,24 @@ class TestBasicCRUDPUT(object):
 		goober.data = 'this is a test, this is only a test'
 		goober.headers['Content-Type'] = 'text/plain'
 		goober.create(specify_uri=True)
+
+
+	# test alternate response formats for resource get
+	def test_alternate_formats(self):
+
+		# RDF XML
+		foo = repo.get_resource('%s/foo' % testing_container_uri, response_format="application/rdf+xml")
+		assert foo.headers['Content-Type'] == 'application/rdf+xml'
+
+		# Turtle
+		foo = repo.get_resource('%s/foo' % testing_container_uri, response_format="text/turtle")
+		assert foo.headers['Content-Type'] == 'text/turtle'
+
+		# with raw API
+		response = repo.api.http_request('GET', foo.uri, data=None, headers={'Accept':'text/turtle'})
+		assert foo.headers['Content-Type'] == 'text/turtle'
+		response = repo.api.http_request('GET', foo.uri, data=None, headers=None, response_format='text/turtle')
+		assert foo.headers['Content-Type'] == 'text/turtle'
 
 
 
