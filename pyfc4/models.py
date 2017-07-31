@@ -235,7 +235,7 @@ class SparqlUpdate(object):
 		self.update_prefixes = {}
 
 	
-	def derive_namespaces(self):
+	def _derive_namespaces(self):
 
 		# iterate through graphs and get unique namespace uris
 		for graph in [self.diffs.overlap, self.diffs.removed, self.diffs.added]:
@@ -255,7 +255,7 @@ class SparqlUpdate(object):
 	def build_query(self):
 
 		# derive namespaces to include prefixes in Sparql update query
-		self.derive_namespaces()
+		self._derive_namespaces()
 
 		q = ''
 
@@ -562,11 +562,18 @@ class Resource(object):
 			self._build_binary()
 
 
-	def _str_to_literal(self, string):
+	def _handle_object(self, string):
 
-		# if object is string, convert to rdflib.term.Literal
+		# if object is string, convert to rdflib.term.Literal with appropriate datatype
 		if type(string) == str:
-			return rdflib.term.Literal(string)
+			return rdflib.term.Literal(string, datatype=rdflib.XSD.string)
+
+		# integer
+
+		# date
+
+		# other?
+
 		else:
 			return string
 
@@ -584,7 +591,7 @@ class Resource(object):
 		add triple by providing p,o, assumes s = subject
 		'''
 
-		self.rdf.graph.add((self.uri, p, self._str_to_literal(o)))
+		self.rdf.graph.add((self.uri, p, self._handle_object(o)))
 
 
 	def set_triple(self, p, o):
@@ -593,7 +600,7 @@ class Resource(object):
 		without knowing s,p, or o, set s,p, or o
 		'''
 		
-		self.rdf.graph.set((self.uri, p, self._str_to_literal(o)))
+		self.rdf.graph.set((self.uri, p, self._handle_object(o)))
 
 
 	def remove_triple(self, p, o):
@@ -602,7 +609,7 @@ class Resource(object):
 		remove triple by supplying s,p,o
 		'''
 
-		self.rdf.graph.remove((self.uri, p, self._str_to_literal(o)))
+		self.rdf.graph.remove((self.uri, p, self._handle_object(o)))
 
 
 	def triples(self, s=None, p=None, o=None):
@@ -611,7 +618,7 @@ class Resource(object):
 
 
 	# update RDF, and for NonRDFSource, binaries
-	def update(self, return_query_only=False):
+	def update(self, sparql_query_only=False):
 
 		'''
 		reworking...
@@ -623,7 +630,7 @@ class Resource(object):
 		# run diff on graphs, send as PATCH request
 		self._diff_graph()		
 		sq = SparqlUpdate(self.rdf.prefixes, self.rdf.diffs)
-		if return_query_only:
+		if sparql_query_only:
 			return sq.build_query()
 		response = self.repo.api.http_request('PATCH', self.uri, data=sq.build_query(), headers={'Content-Type':'application/sparql-update'})
 
