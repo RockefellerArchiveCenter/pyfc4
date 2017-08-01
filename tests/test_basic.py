@@ -446,10 +446,10 @@ class TestIndirectContainer(object):
 	def test_create_ic(self):
 
 		# retrieve goober
-		goober = repo.get_resource('goober')
+		goober = repo.get_resource('%s/goober' % testing_container_uri)
 
 		# retrieve foo
-		foo = repo.get_resource('foo')
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
 
 		# create IndirectContainer that sets a foaf:based_near relationship from goober to foo
 		ding = IndirectContainer(repo,'%s/ding' % testing_container_uri, membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.based_near, insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
