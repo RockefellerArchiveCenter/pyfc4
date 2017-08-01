@@ -1,12 +1,12 @@
 # pyfc4
 
-Python 3.x client for [Fedora Commons 4.x](http://fedorarepository.org/)
-
 ![Travis Build](https://travis-ci.org/ghukill/pyfc4.svg?branch=master "Travis Build")
+
+Python 3.5+ client for [Fedora Commons 4.7+ (FC4)](http://fedorarepository.org/).
 
 ## Requirements
 
-  * Python 3.x
+  * Python 3.5+
 
 ## Installation
 
@@ -16,7 +16,7 @@ pip install -e .
 
 ## Tests
 
-Requires `pyfc4` installed as module.
+Requires `pyfc4` installed as module, and without any configuration, an instance of FC4 running at `http://localhost:8080/rest`.
 
 ```
 ./runtests.sh
@@ -46,8 +46,6 @@ Create child resource `foo/bar` under `foo`:
 bar = BasicContainer(repo, 'foo/bar')
 bar.create(specify_uri=True) 
 ```
-
-
 
 Alternatively, use the built-in Fedora URI minter issuing `POST` requests by not setting `specify_uri` (which defaults to `False`).
 
