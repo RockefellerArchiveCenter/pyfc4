@@ -111,8 +111,15 @@ class Repository(object):
 
 		'''
 		return appropriate Resource-type instance
-			- issue HEAD request, sniff out content-type to detect NonRDF
-			- issue GET request 
+			- issue HEAD request, determine Resource type (BasicContainer, DirectContainer, IndirectContainer, or NonRDFSource (Binary))
+			- issue GET request and retrieve resource metadata at uri/fcr:metadata
+
+		Args:
+			uri (rdflib.term.URIRef,str): input URI
+			response_format (str): expects mimetype / Content-Type header such as 'application/rdf+xml', 'text/turtle', etc.
+
+		Returns:
+			Resource
 		'''
 
 		# handle uri
@@ -144,11 +151,13 @@ class Repository(object):
 
 
 
-# API
 class API(object):
 
 	'''
-	API for making requests and parsing responses from FC4 endpoint
+	API for making requests and parsing responses from repository endpoint
+
+	Args:
+		repo (Repository): instance of Repository class
 	'''
 
 	def __init__(self, repo):
@@ -167,6 +176,24 @@ class API(object):
 			is_rdf = True,
 			stream = False
 		):
+
+		'''
+		Primary route for all HTTP requests to repository.  Ability to set most parameters for requests library,
+		with some additional convenience parameters as well.
+
+		Args:
+			verb (str): HTTP verb to use for request, e.g. PUT, POST, GET, HEAD, PATCH, etc.
+			uri (rdflib.term.URIRef,str): input URI
+			data (str,file): payload of data to send for request, may be overridden in preperation of request
+			headers (dict): optional dictionary of headers passed directly to requests.request
+			files (dict): optional dictionary of files passed directly to requests.request
+			response_format (str): desired response format for resource's payload, e.g. 'application/rdf+xml', 'text/turtle', etc.
+			is_rdf (bool): if True, set Accept header based on combination of response_format and headers
+			stream (bool): passed directly to requests.request for stream parameter
+
+		Returns:
+			requests.models.Response
+		'''
 
 		# set content negotiated response format for RDFSources
 		if is_rdf:
@@ -208,6 +235,16 @@ class API(object):
 
 
 	def parse_resource_type(self, response):
+
+		'''
+		parse resource type from self.http_request()
+
+		Args:
+			response (requests.models.Response): response object
+
+		Returns:
+			[NonRDFSource, BasicContainer, DirectContainer, IndirectContainer]
+		'''
 		
 		# parse 'Link' header
 		links = [link.split(";")[0] for link in response.headers['Link'].split(', ') if link.startswith('<http://www.w3.org/ns/ldp#')]
@@ -235,7 +272,12 @@ class API(object):
 class SparqlUpdate(object):
 
 	'''
-	class to handle the creation of Sparql updates via PATCH request
+	Class to handle the creation of Sparql updates via PATCH request.
+	Accepts prefixes and graphs from resource, computes diff of graphs, and builds sparql query for update.
+
+	Args:
+		prefixes (types.SimpleNamespace): prefixes from resource at self.rdf.prefixes
+		diffs (types.SimpleNamespace): diffs is comprised of three graphs that are derived from self._diff_graph(), at self.rdf.diffs 
 	'''
 
 	def __init__(self, prefixes, diffs):
@@ -249,6 +291,17 @@ class SparqlUpdate(object):
 
 	
 	def _derive_namespaces(self):
+
+		'''
+		Small method to loop through three graphs in self.diffs, identify unique namespace URIs.
+		Then, loop through provided dictionary of prefixes and pin one to another.
+
+		Args:
+			None: uses self.prefixes and self.diffs
+
+		Returns:
+			None: sets self.update_namespaces and self.update_prefixes
+		'''
 
 		# iterate through graphs and get unique namespace uris
 		for graph in [self.diffs.overlap, self.diffs.removed, self.diffs.added]:
@@ -266,6 +319,24 @@ class SparqlUpdate(object):
 
 
 	def build_query(self):
+
+		'''
+		Using the three graphs derived from self._diff_graph(), build a sparql update query in the format:
+		
+		PREFIX foo: <http://foo.com>
+		PREFIX bar: <http://bar.com>
+
+		DELETE {...}
+		INSERT {...}
+		WHERE {...}
+
+		Args:
+			None: uses variables from self
+
+		Returns:
+			(str) sparql update query as string
+
+		'''
 
 		# derive namespaces to include prefixes in Sparql update query
 		self._derive_namespaces()
@@ -294,13 +365,25 @@ class SparqlUpdate(object):
 
 
 
-# Resource
 class Resource(object):
 
 	'''
 	Linked Data Platform Resource (LDPR)
 	A HTTP resource whose state is represented in any way that conforms to the simple lifecycle patterns and conventions in section 4. Linked Data Platform Resources.
 	https://www.w3.org/TR/ldp/
+
+	In the LDP hierarchy, this class represents the most abstract entity of "Resource".
+
+	Sub-classed by:
+		NonRDFSource, Container
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		data (): passed from sub-classes
+		headers (dict): passed from sub-classes
+		status_code (int): passed from sub-classes
+		rdf_prefixes_mixins (dict): optional rdf prefixes and namespaces
 	'''
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, rdf_prefixes_mixins=None):
@@ -329,6 +412,14 @@ class Resource(object):
 
 
 	def uri_as_string(self):
+
+		'''
+		return rdflib.term.URIRef URI as string
+
+		Returns:
+			(str)
+		'''
+
 		return self.uri.toPython()
 
 
@@ -336,6 +427,9 @@ class Resource(object):
 		
 		'''
 		Check if resource exists, update self.exists, returns
+
+		Returns:
+			None: sets self.exists
 		'''
 
 		response = self.repo.api.http_request('HEAD', self.uri)
@@ -350,7 +444,12 @@ class Resource(object):
 	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None):
 
 		'''
-		when object is created, self.data and self.headers are passed with the requests
+		Primary method to create resources.
+
+		Args:
+			specify_uri (bool): If True, uses PUT verb and sets the URI during creation.  If False, uses POST and gets repository minted URI
+			ignore_tombstone (bool): If True, will attempt creation, if tombstone exists (409), will delete tombstone and retry
+			serialization_format(str): Content-Type header / mimetype that will be used to serialize self.rdf.graph, and set headers for PUT/POST requests
 		'''
 
 		# if resource claims existence, raise exception
@@ -388,46 +487,64 @@ class Resource(object):
 
 	def _handle_create(self, response, ignore_tombstone):
 
-			# 201, success, refresh
-			if response.status_code == 201:
-				# if not specifying uri, capture from response and append to object
-				self.uri = self.repo.parse_uri(response.text)
-				# creation successful, update resource
-				self.refresh()
+		'''
+		Handles response from self.create()
 
-			# 404, assumed POST, target location does not exist
-			elif response.status_code == 404:
-				raise Exception('for this POST request, target location does not exist')
+		Args:
+			response (requests.models.Response): response object from self.create()
+			ignore_tombstone (bool): If True, will attempt creation, if tombstone exists (409), will delete tombstone and retry
+		'''
 
-			# 409, conflict, resource likely exists
-			elif response.status_code == 409:
-				raise Exception('resource already exists')
-			
-			# 410, tombstone present
-			elif response.status_code == 410:
-				if ignore_tombstone:
-					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
-					if response.status_code == 204:
-						logger.debug('tombstone removed, retrying create')
-						self.create()
-					else:
-						raise Exception('Could not remove tombstone for %s' % self.uri)
+		# 201, success, refresh
+		if response.status_code == 201:
+			# if not specifying uri, capture from response and append to object
+			self.uri = self.repo.parse_uri(response.text)
+			# creation successful, update resource
+			self.refresh()
+
+		# 404, assumed POST, target location does not exist
+		elif response.status_code == 404:
+			raise Exception('for this POST request, target location does not exist')
+
+		# 409, conflict, resource likely exists
+		elif response.status_code == 409:
+			raise Exception('resource already exists')
+		
+		# 410, tombstone present
+		elif response.status_code == 410:
+			if ignore_tombstone:
+				response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
+				if response.status_code == 204:
+					logger.debug('tombstone removed, retrying create')
+					self.create()
 				else:
-					raise Exception('tombstone for %s detected, aborting' % self.uri)
-
-			# 415, unsupported media type
-			elif response.status_code == 415:
-				raise Exception('unsupported media type')
-
-			# unknown status code
+					raise Exception('Could not remove tombstone for %s' % self.uri)
 			else:
-				raise Exception('unknown error creating, status code: %s' % response.status_code)
+				raise Exception('tombstone for %s detected, aborting' % self.uri)
 
-			# if all goes well, return True
-			return True
+		# 415, unsupported media type
+		elif response.status_code == 415:
+			raise Exception('unsupported media type')
+
+		# unknown status code
+		else:
+			raise Exception('unknown error creating, status code: %s' % response.status_code)
+
+		# if all goes well, return True
+		return True
 
 
 	def delete(self, remove_tombstone=True):
+
+		'''
+		Method to delete resources.
+
+		Args:
+			remove_tombstone (bool): If True, will remove tombstone at uri/fcr:tombstone when removing resource.
+
+		Returns:
+			(bool)
+		'''
 
 		response = self.repo.api.http_request('DELETE', self.uri)
 
@@ -439,11 +556,19 @@ class Resource(object):
 		if remove_tombstone:
 			self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
 
+		return True
+
 
 	def refresh(self):
 		
 		'''
-		refreshes exists, status_code, data, and headers from repo for uri
+		Performs GET request and refreshes RDF information for resource.
+
+		Args:
+			None
+
+		Returns:
+			None
 		'''
 
 		updated_self = self.repo.get_resource(self.uri)
@@ -471,7 +596,13 @@ class Resource(object):
 	def _build_rdf(self, data=None):
 
 		'''
-		parse incoming rdf as self.rdf.orig_graph, create copy at self.rdf.graph
+		Parse incoming rdf as self.rdf.orig_graph, create copy at self.rdf.graph
+
+		Args:
+			data (): payload from GET request, expected RDF content in various serialization formats
+
+		Returns:
+			None
 		'''
 
 		# recreate rdf data
@@ -482,32 +613,41 @@ class Resource(object):
 		for prefix,uri in self.repo.context.items():
 			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
 		# graph
-		if self.exists:
-			self._parse_graph() # parse graph
-		else:
-			self.rdf.graph = rdflib.Graph() # instantiate empty graph
+		self._parse_graph()
 
 
 	def _parse_graph(self):
 
 		'''
 		use Content-Type from headers to determine parsing method
+
+		Args:
+			None
+
+		Return:
+			None: sets self.rdf by parsing data from GET request, or setting blank graph of resource does not yet exist
 		'''
 
-		# handle edge case for content-types not recognized by rdflib parser
-		if self.headers['Content-Type'].startswith('text/plain'):
-			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
-			parse_format = 'application/n-triples'
+		# if resource exists, parse self.rdf.data
+		if self.exists:
+			# handle edge case for content-types not recognized by rdflib parser
+			if self.headers['Content-Type'].startswith('text/plain'):
+				logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+				parse_format = 'application/n-triples'
+			else:
+				parse_format = self.headers['Content-Type']
+
+			# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+			if ';charset' in parse_format:
+				parse_format = parse_format.split(';')[0]
+			
+			# parse graph	
+			self.rdf.graph = rdflib.Graph().parse(data=self.rdf.data.decode('utf-8'), format=parse_format)
+
+		# else, create empty graph
 		else:
-			parse_format = self.headers['Content-Type']
-
-		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
-		if ';charset' in parse_format:
-			parse_format = parse_format.split(';')[0]
-		
-		# parse graph	
-		self.rdf.graph = rdflib.Graph().parse(data=self.rdf.data.decode('utf-8'), format=parse_format)
-
+			self.rdf.graph = rdflib.Graph()
+			
 		# bind any additional namespaces from repo instance, but do not override
 		self.rdf.namespace_manager = rdflib.namespace.NamespaceManager(self.rdf.graph)
 		for ns_prefix, ns_uri in self.rdf.prefixes.__dict__.items():
@@ -524,8 +664,22 @@ class Resource(object):
 	def _diff_graph(self):
 
 		'''
-		using rdflib.compare diff, https://github.com/RDFLib/rdflib/blob/master/rdflib/compare.py
-			- determine triples to add, remove, modify
+		Uses rdflib.compare diff, https://github.com/RDFLib/rdflib/blob/master/rdflib/compare.py
+		When a resource is retrieved, the graph retrieved and parsed at that time is saved to self.rdf._orig_graph,
+		and all local modifications are made to self.rdf.graph.  This method compares the two graphs and returns the diff
+		in the format of three graphs:
+
+			overlap - triples shared by both
+			removed - triples that exist ONLY in the original graph, self.rdf._orig_graph
+			added - triples that exist ONLY in the modified graph, self.rdf.graph
+
+		These are used for building a sparql update query for self.update.
+
+		Args:
+			None
+		
+		Returns:
+			None: sets self.rdf.diffs and adds the three graphs mentioned, 'overlap', 'removed', and 'added'
 		'''
 
 		overlap, removed, added = graph_diff(to_isomorphic(self.rdf._orig_graph), to_isomorphic(self.rdf.graph))
@@ -545,7 +699,12 @@ class Resource(object):
 		adds to self.rdf.prefixes which will endure through create/update/refresh,
 		and get added back to parsed graph namespaces
 
-		EXPECTS: string namespace prefix, string namespace uri
+		Args:
+			ns_prefix (str): prefix for namespace, e.g. 'dc', 'foaf'
+			ns_uri (str): string of namespace / ontology. e.g. 'http://purl.org/dc/elements/1.1/', 'http://xmlns.com/foaf/0.1/'
+
+		Returns:
+			None: binds this new prefix:namespace combination to self.rdf.prefixes for use, and self.rdf.graph for serialization
 		'''
 
 		# add to prefixes
@@ -556,6 +715,16 @@ class Resource(object):
 
 
 	def _build_binary(self):
+
+		'''
+		builds binary attributes for resource
+
+		Args:
+			None
+
+		Return:
+			None: sets various attributes
+		'''
 
 		# binary data
 		self.binary = SimpleNamespace()
@@ -570,6 +739,12 @@ class Resource(object):
 
 		'''
 		small method to empty values if resource is removed or absent
+
+		Args:
+			None
+
+		Return:
+			None: empties selected resource attributes
 		'''
 
 		self.status_code = 404
@@ -585,6 +760,17 @@ class Resource(object):
 
 
 	def _handle_object(self, object_input):
+
+		'''
+		Method to handle possible values passed for adding, removing, modifying triples.
+		Detects type of input and sets appropriate http://www.w3.org/2001/XMLSchema# datatype
+
+		Args:
+			object_input (str,int,datetime,): many possible inputs
+
+		Returns:
+			(rdflib.term.Literal): with appropriate datatype attribute
+		'''
 
 		# if object is string, convert to rdflib.term.Literal with appropriate datatype
 		if type(object_input) == str:
@@ -610,6 +796,13 @@ class Resource(object):
 
 		'''
 		add triple by providing p,o, assumes s = subject
+
+		Args:
+			p (rdflib.term.URIRef): predicate
+			o (): object
+
+		Returns:
+			None: adds triple to self.rdf.graph
 		'''
 
 		self.rdf.graph.add((self.uri, p, self._handle_object(o)))
@@ -618,7 +811,14 @@ class Resource(object):
 	def set_triple(self, p, o):
 		
 		'''
-		without knowing s,p, or o, set s,p, or o
+		Assuming the predicate or object matches a single triple, sets the other for that triple.
+
+		Args:
+			p (rdflib.term.URIRef): predicate
+			o (): object
+
+		Returns:
+			None: modifies pre-existing triple in self.rdf.graph
 		'''
 		
 		self.rdf.graph.set((self.uri, p, self._handle_object(o)))
@@ -627,25 +827,50 @@ class Resource(object):
 	def remove_triple(self, p, o):
 
 		'''
-		remove triple by supplying s,p,o
+		remove triple by supplying p,o
+
+		Args:
+			p (rdflib.term.URIRef): predicate
+			o (): object
+
+		Returns:
+			None: removes triple from self.rdf.graph
 		'''
 
 		self.rdf.graph.remove((self.uri, p, self._handle_object(o)))
 
 
-	def triples(self, s=None, p=None, o=None):
+	def triples(self, p=None, o=None):
 
-		return self.rdf.graph.triples((s, p, o))
+		'''
+		convenience method for self.rdf.graph.triples
+
+		Args:
+			p (rdflib.term.URIRef): predicate
+			o (): object
+
+		Returns:
+			(generator)
+
+		'''
+
+		return self.rdf.graph.triples((self.uri, p, o))
 
 
 	# update RDF, and for NonRDFSource, binaries
 	def update(self, sparql_query_only=False):
 
 		'''
-		reworking...
+		Method to update resources in repository.  Firing this method computes the difference in the local modified graph and the original one, 
+		creates an instance of SparqlUpdate and builds a sparql query that represents these differences, and sends this as a PATCH request.
 
-			- PUT requests were not appropriate for updates to RDF
-			- PATCH requests will be more fitting, but will need to queue up changes, then submit as SparqlPatch query
+		If the resource is NonRDF (Binary), this also method also updates the binary data.
+
+		Args:
+			sparql_query_only (bool): If True, returns only the sparql query string and does not perform any actual updates
+
+		Returns:
+			(bool) 
 		'''
 
 		# run diff on graphs, send as PATCH request
@@ -664,6 +889,7 @@ class Resource(object):
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
 			self.refresh()
+			return True
 
 
 
@@ -674,6 +900,16 @@ class NonRDFSource(Resource):
 	Linked Data Platform Non-RDF Source (LDP-NR)
 	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
 	https://www.w3.org/TR/ldp/
+
+	Inherits:
+		Resource
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		data (): passed from sub-classes
+		headers (dict): passed from sub-classes
+		status_code (int): passed from sub-classes
 	'''
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
@@ -702,17 +938,13 @@ class NonRDFSource(Resource):
 	def _prep_binary_data(self):
 
 		'''
-		method is used to check/prep data and headers for NonRDFSource create
+		method is used to check/prep data and headers for NonRDFSource create or update
 
-		This approach from eulfedora might be helpful:
-		# location of content trumps attached content
-		https://github.com/emory-libraries/eulfedora/blob/master/eulfedora/models.py#L361-L367
-		# sending attached content as payload (file-like object)
-		https://github.com/emory-libraries/eulfedora/blob/64eaf999fbff39e809bf1d1da377a972c9685441/eulfedora/api.py#L373-L385
+		Args:
+			None
 
-		Also consider external reference per FC4 spec (https://wiki.duraspace.org/display/FEDORA40/RESTful+HTTP+API+-+Containers#RESTfulHTTPAPI-Containers-BluePOSTCreatenewresourceswithinaLDPcontainer):
-		Example (4): Creating a new binary resource at a specified path redirecting to external content
-			curl -X PUT -H"Content-Type: message/external-body; access-type=URL; URL=\"http://www.example.com/file\"" "http://localhost:8080/rest/node/to/create"
+		Returns:
+			None: sets attributes in self.binary and headers
 		'''
 
 		logger.debug('preparing NonRDFSource data for create/update')
@@ -727,7 +959,14 @@ class NonRDFSource(Resource):
 	def _prep_binary_mimetype(self):
 
 		'''
-		implicitly favors Content-Type header if set
+		Sets Content-Type header based on headers and/or self.binary.mimetype values
+		Implicitly favors Content-Type header if set
+
+		Args:
+			None
+
+		Returns:
+			None: sets attributes in self.binary and headers
 		'''
 
 		# neither present
@@ -743,8 +982,14 @@ class NonRDFSource(Resource):
 	def _prep_binary_content(self):
 
 		'''		
-		favors Content-Location header if set
-		sets delivery method of either payload or header
+		Sets delivery method of either payload or header
+		Favors Content-Location header if set
+
+		Args:
+			None
+
+		Returns:
+			None: sets attributes in self.binary and headers
 		'''
 
 		# nothing present
@@ -778,7 +1023,7 @@ class NonRDFSource(Resource):
 					self.binary.delivery = 'payload'
 
 
-# 'Binary' alias for NonRDFSource
+# 'Binary' is an alias for NonRDFSource
 Binary = NonRDFSource
 
 
@@ -789,6 +1034,19 @@ class RDFResource(Resource):
 	Linked Data Platform RDF Source (LDP-RS)
 	An LDPR whose state is fully represented in RDF, corresponding to an RDF graph. See also the term RDF Source from [rdf11-concepts].
 	https://www.w3.org/TR/ldp/
+
+	Sub-classed by:
+		Container
+
+	Inherits:
+		Resource
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		data (): passed from sub-classes
+		headers (dict): passed from sub-classes
+		status_code (int): passed from sub-classes
 	'''
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
@@ -805,6 +1063,19 @@ class Container(RDFResource):
 	Linked Data Platform Container (LDPC)
 	A LDP-RS representing a collection of linked documents (RDF Document [rdf11-concepts] or information resources [WEBARCH]) that responds to client requests for creation, modification, and/or enumeration of its linked members and documents, and that conforms to the simple lifecycle patterns and conventions in section 5. Linked Data Platform Containers.
 	https://www.w3.org/TR/ldp/
+
+	Sub-classed by:
+		BasicContainer, IndirectContainer, DirectContainer
+
+	Inherits:
+		RDFResource
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		data (): passed from sub-classes
+		headers (dict): passed from sub-classes
+		status_code (int): passed from sub-classes
 	'''
 
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
@@ -856,6 +1127,16 @@ class BasicContainer(Container):
 
 	https://gist.github.com/hectorcorrea/dc20d743583488168703
 		- "The important thing to notice is that by posting to a Basic Container, the LDP server automatically adds a triple with ldp:contains predicate pointing to the new resource created."
+
+	Inherits:
+		Container
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		data (): passed from sub-classes
+		headers (dict): passed from sub-classes
+		status_code (int): passed from sub-classes
 	'''
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
@@ -875,6 +1156,17 @@ class DirectContainer(Container):
 
 	When adding children, can also write relationships to another resource
 
+	Inherits:
+		Container
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		data (): passed from sub-classes
+		headers (dict): passed from sub-classes
+		status_code (int): passed from sub-classes
+		membershipResource (rdflib.term.URIRef): resource that will accumlate triples as children are added
+		hasMemberRelation (rdflib.term.URIRef): predicate that will be used when pointing from URI in ldp:membershipResource to children
 	'''
 	
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None):
@@ -900,6 +1192,19 @@ class IndirectContainer(Container):
 	Linked Data Platform Indirect Container (LDP-IC)
 	An LDPC similar to a LDP-DC that is also capable of having members whose URIs are based on the content of its contained documents rather than the URIs assigned to those documents.
 	https://www.w3.org/TR/ldp/
+
+	Inherits:
+		Container
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		data (): passed from sub-classes
+		headers (dict): passed from sub-classes
+		status_code (int): passed from sub-classes
+		membershipResource (rdflib.term): resource that will accumlate triples as children are added
+		hasMemberRelation (rdflib.term): predicate that will be used when pointing from URI in ldp:membershipResource to ldp:insertedContentRelation
+		insertedContentRelation (rdflib.term): destination for ldp:hasMemberRelation from ldp:membershipResource
 	'''
 
 	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None, insertedContentRelation=None):
