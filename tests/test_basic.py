@@ -374,8 +374,30 @@ class TestBasicCRUDPOST(object):
 		assert bc == False
 
 
+	# create POST confirmations
+	def test_bc_post_exceptions(self):
 
+		# test create
+		bc = BasicContainer(repo, '%s' % testing_container_uri)
+		bc.create()
+		bc_uri = bc.uri
+		assert bc.exists
 
+		# create child resource
+		bc1 = BasicContainer(repo, bc.uri)
+		bc1.create()
+		assert bc1.exists
+
+		# create child at bad location
+		bc2 = BasicContainer(repo, "%s/does/not/exist" % bc.uri)
+		with pytest.raises(Exception) as excinfo:
+			bc2.create()
+		assert 'target location does not exist' in str(excinfo.value)	
+
+		# test delete
+		bc.delete()
+		bc = repo.get_resource(bc_uri)
+		assert bc == False
 
 
 
