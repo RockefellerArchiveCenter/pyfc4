@@ -29,6 +29,11 @@ def create_demo_resources():
 	foo = BasicContainer(repo, 'foo')
 	foo.create(specify_uri=True)
 
+	# goober
+	global goober
+	goober = BasicContainer(repo, 'goober')
+	goober.create(specify_uri=True)
+
 	# bar
 	global bar
 	bar = BasicContainer(repo, 'foo/bar')
@@ -41,12 +46,14 @@ def create_demo_resources():
 	baz.binary.mimetype = 'text/plain'
 	baz.create(specify_uri=True)
 
-	return (foo,bar,baz)
+	return (foo,goober,bar,baz)
 
 
 def get_demo_resources():
 	global foo
 	foo = repo.get_resource('foo')
+	global goober
+	goober = repo.get_resource('goober')
 	global bar
 	bar = repo.get_resource('foo/bar')
 	global baz
@@ -57,3 +64,5 @@ def delete_demo_resources():
 
 	foo = repo.get_resource('foo')
 	foo.delete()
+	goober = repo.get_resource('goober')
+	goober.delete()

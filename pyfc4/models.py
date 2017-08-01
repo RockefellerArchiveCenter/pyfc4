@@ -476,8 +476,11 @@ class Resource(object):
 		# populate prefixes
 		for prefix,uri in self.repo.context.items():
 			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
+		# graph
 		if self.exists:
-			self._parse_graph()
+			self._parse_graph() # parse graph
+		else:
+			self.rdf.graph = rdflib.Graph() # instantiate empty graph
 
 
 	def _parse_graph(self):
@@ -868,7 +871,11 @@ class DirectContainer(Container):
 	When adding children, can also write relationships to another resource
 
 	'''
-	pass
+	
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+
+		# fire parent Container init()
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 
 
