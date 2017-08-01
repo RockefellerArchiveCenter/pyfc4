@@ -27,7 +27,7 @@ class Repository(object):
 		username (str): username for authorization and roles
 		password (str): password authorziation and roles
 		context (dict): dictionary of namespace prefixes and namespace URIs that propagate to Resources 
-		default_response_format (str): mimetype of default Accept and Content-Type headers
+		default_serialization (str): mimetype of default Accept and Content-Type headers
 
 	Attributes:
 		context (dict): Default dictionary of namespace prefixes and namespace URIs
@@ -56,7 +56,7 @@ class Repository(object):
 			username,
 			password,
 			context = None,
-			default_response_format = 'text/turtle'
+			default_serialization = 'application/rdf+xml'
 		):
 
 		self.root = root
@@ -64,7 +64,7 @@ class Repository(object):
 			self.root += '/'
 		self.username = username
 		self.password = password
-		self.default_response_format = default_response_format
+		self.default_serialization = default_serialization
 
 		# API facade
 		self.api = API(self)
@@ -183,7 +183,7 @@ class API(object):
 			if verb == 'GET':
 				# if no response_format has been requested to this point, use repository instance default
 				if not response_format:
-					response_format = self.repo.default_response_format
+					response_format = self.repo.default_serialization
 				# if headers present, append
 				if headers and 'Accept' not in headers.keys():
 					headers['Accept'] = response_format
@@ -372,9 +372,11 @@ class Resource(object):
 			if type(self) == NonRDFSource:
 				self._prep_binary_data()
 				data = self.binary.data
+
 			# otherwise, set data as self.rdf.data
 			else:
-				data = self.rdf.data
+				data = self.rdf.graph.serialize(format=self.repo.default_serialization)
+				self.headers['Content-Type'] = self.repo.default_serialization
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
@@ -877,6 +879,8 @@ class DirectContainer(Container):
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
+		# if not yet exists, scaffold DirectContainer requirements
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
 
 
 # Indirect Container
