@@ -388,11 +388,26 @@ class TestBasicCRUDPOST(object):
 		bc1.create()
 		assert bc1.exists
 
-		# create child at bad location
+		# 404 - create child at bad location
 		bc2 = BasicContainer(repo, "%s/does/not/exist" % bc.uri)
 		with pytest.raises(Exception) as excinfo:
 			bc2.create()
-		assert 'target location does not exist' in str(excinfo.value)	
+		assert 'target location does not exist' in str(excinfo.value)
+
+		# 409 - create resrouce where another exists
+		bc3 = BasicContainer(repo, bc.uri)
+		with pytest.raises(Exception) as excinfo:
+			bc3.create(specify_uri=True)
+		assert 'resource already exists' in str(excinfo.value)
+
+		# 410 - tombstone
+		bc4 = BasicContainer(repo, '%s' % testing_container_uri)
+		bc4.create()
+		bc4.delete(remove_tombstone=False)
+		bc5 = BasicContainer(repo, bc4.uri)
+		with pytest.raises(Exception) as excinfo:
+			bc5.create(specify_uri=True)
+		assert 'tombstone for %s detected' % bc4.uri in str(excinfo.value)
 
 		# test delete
 		bc.delete()

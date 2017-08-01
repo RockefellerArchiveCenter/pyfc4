@@ -17,14 +17,22 @@ logger.setLevel(logging.DEBUG)
 
 
 
-# Repository
 class Repository(object):
 	
 	'''
 	Class for Fedora Commons 4 (FC4), LDP server instance
+
+	Args:
+		root (str): Full URL of repository REST endpoint (e.g. http://localhost:8080/rest)
+		username (str): username for authorization and roles
+		password (str): password authorziation and roles
+		context (dict): dictionary of namespace prefixes and namespace URIs that propagate to Resources 
+		default_response_format (str): mimetype of default Accept and Content-Type headers
+
+	Attributes:
+		context (dict): Default dictionary of namespace prefixes and namespace URIs
 	'''
 
-	# provide some default namespaces for graph binding
 	context = {
 		'premis':'http://www.loc.gov/premis/rdf/v1#',
 		'test':'info:fedora/test/',
@@ -43,18 +51,16 @@ class Repository(object):
 		'dc':'http://purl.org/dc/elements/1.1/'
 	}
 
-
 	def __init__(self, 
 			root,
 			username,
 			password,
-			context=None,
-			default_response_format='text/turtle'
+			context = None,
+			default_response_format = 'text/turtle'
 		):
 
 		self.root = root
-		# ensure trailing slash
-		if not self.root.endswith('/'):
+		if not self.root.endswith('/'): # ensure trailing slash
 			self.root += '/'
 		self.username = username
 		self.password = password
@@ -73,6 +79,12 @@ class Repository(object):
 	
 		'''
 		parses and cleans up possible uri inputs, return instance of rdflib.term.URIRef
+
+		Args:
+			uri (rdflib.term.URIRef,str): input URI
+
+		Returns:
+			rdflib.term.URIRef
 		'''
 
 		# no uri provided, assume root
@@ -388,7 +400,6 @@ class Resource(object):
 			
 			# 410, tombstone present
 			elif response.status_code == 410:
-				logger.debug('tombstone for %s detected, aborting' % self.uri)
 				if ignore_tombstone:
 					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
 					if response.status_code == 204:
@@ -396,6 +407,8 @@ class Resource(object):
 						self.create()
 					else:
 						raise Exception('Could not remove tombstone for %s' % self.uri)
+				else:
+					raise Exception('tombstone for %s detected, aborting' % self.uri)
 
 			# 415, unsupported media type
 			elif response.status_code == 415:
