@@ -198,6 +198,8 @@ foo.remove_triple(foo.rdf.prefixes.dc.subject, 'minty')
 foo.update()
 ```
 
+**Note:** Multiple additions and removals can happen before issuing `.update()`.  All modifications are stored locally in a graph, then diffed against the last known graph from the repository, and only changes are sent.
+
 In addition to the default prefixes/namespaces, you can instantiate a repository instance with additional prefixes that will trickle through and be available in similar fashion:
 
 ```
