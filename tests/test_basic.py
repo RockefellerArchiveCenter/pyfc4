@@ -440,6 +440,33 @@ class TestDirectContainer(object):
 		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.knows)) == tronic2.uri
 
 
+# test creation and linkages of DirectContainers
+class TestIndirectContainer(object):
+
+	def test_create_ic(self):
+
+		# retrieve goober
+		goober = repo.get_resource('goober')
+
+		# retrieve foo
+		foo = repo.get_resource('foo')
+
+		# create IndirectContainer that sets a foaf:based_near relationship from goober to foo
+		ding = IndirectContainer(repo,'%s/ding' % testing_container_uri, membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.based_near, insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
+		ding.create(specify_uri=True)
+		assert ding.exists
+
+		# create child resource to ding
+		dong = BasicContainer(repo,'%s/ding/dong' % testing_container_uri)
+		# add triple that triggers dong's IndirectContainer relationship
+		dong.add_triple(dong.rdf.prefixes.foaf.based_near, foo.uri)
+		dong.create(specify_uri=True)
+		assert dong.exists
+
+		# finally, assert triple from goober --> foaf:based_near --> foo
+		goober.refresh()
+		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.based_near)) == foo.uri
+
 
 
 ########################################################

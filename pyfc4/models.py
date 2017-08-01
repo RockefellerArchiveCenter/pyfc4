@@ -885,7 +885,7 @@ class DirectContainer(Container):
 		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
 
-		# if membershipResource or hasMemberRelation args are set, set triples as well
+		# if membershipResource or hasMemberRelation args are set, set triples
 		if membershipResource:
 			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
 		if hasMemberRelation:
@@ -901,6 +901,21 @@ class IndirectContainer(Container):
 	An LDPC similar to a LDP-DC that is also capable of having members whose URIs are based on the content of its contained documents rather than the URIs assigned to those documents.
 	https://www.w3.org/TR/ldp/
 	'''
-	pass
+
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None, insertedContentRelation=None):
+
+		# fire parent Container init()
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+	
+		# if resource does not yet exist, set rdf:type
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.IndirectContainer)
+
+		# if membershipResource, hasMemberRelation, or insertedContentRelation args are set, set triples
+		if membershipResource:
+			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
+		if hasMemberRelation:
+			self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
+		if insertedContentRelation:
+			self.add_triple(self.rdf.prefixes.ldp.insertedContentRelation, insertedContentRelation)
 
 
