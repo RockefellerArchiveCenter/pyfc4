@@ -877,13 +877,20 @@ class DirectContainer(Container):
 
 	'''
 	
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
-		# if not yet exists, scaffold DirectContainer requirements
+		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
+
+		# if membershipResource or hasMemberRelation args are set, set triples as well
+		if membershipResource:
+			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
+		if hasMemberRelation:
+			self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
+
 
 
 # Indirect Container

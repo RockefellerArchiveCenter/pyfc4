@@ -415,6 +415,32 @@ class TestBasicCRUDPOST(object):
 		assert bc == False
 
 
+# test creation and linkages of DirectContainers
+class TestDirectContainer(object):
+
+	def test_create_dc(self):
+
+		# create target goober container
+		goober = BasicContainer(repo, '%s/goober' % testing_container_uri)
+		goober.create(specify_uri=True)
+		assert goober.exists
+
+		# create DirectContainer that relates to goober
+		tronic = DirectContainer(repo, '%s/tronic' % testing_container_uri, membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.knows)
+		tronic.create(specify_uri=True)
+		assert tronic.exists
+
+		# create child to tronic, that goober should then relate to
+		tronic2 = BasicContainer(repo, '%s/tronic/tronic2' % testing_container_uri)
+		tronic2.create(specify_uri=True)
+		assert tronic2.exists
+
+		# finally, assert foaf:knows relation for goober --> tronic2 exists
+		goober.refresh()
+		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.knows)) == tronic2.uri
+
+
+
 
 ########################################################
 # TEARDOWN
