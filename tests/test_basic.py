@@ -51,6 +51,27 @@ class TestSetup(object):
 
 class TestBasicCRUDPUT(object):
 
+	# test get root
+	def test_get_root_and_helpers(self):
+
+		# get root node
+		root = repo.get_resource(None)
+		assert root.exists
+
+		# test __repr__
+		assert root.__repr__() == '<BasicContainer Resource, uri: %s>' % repo.root
+
+		# test uri_as_string
+		assert root.uri_as_string() == repo.root
+
+
+	# test bad uri
+	def test_bad_uri(self):
+
+		with pytest.raises(Exception) as excinfo:
+			repo.get_resource('*%($')
+		assert 'error retrieving resource' in str(excinfo.value)	
+
 	
 	# create foo (basic container)
 	def test_create_bc(self):
@@ -103,6 +124,30 @@ class TestBasicCRUDPUT(object):
 		assert bar.exists
 
 
+	# create child, retrieve, delete, confirm with check_exists()
+	def test_resource_existence(self):
+
+		# create temp child resource
+		tronic = BasicContainer(repo, '%s/foo/tronic' % testing_container_uri)
+		tronic.create(specify_uri=True)
+		assert tronic.check_exists()
+
+		# attempt to recreate
+		tronic_clone = BasicContainer(repo, '%s/foo/tronic' % testing_container_uri)
+		with pytest.raises(Exception) as excinfo:
+			tronic.create(specify_uri=True)
+		assert 'resource exists attribute True' in str(excinfo.value)
+
+		# delete tronic
+		tronic_removal = repo.get_resource('%s/foo/tronic' % testing_container_uri)
+		tronic_removal.delete()
+		assert not tronic_removal.exists
+
+		# confirm check_exists() updates resource instance
+		tronic.check_exists()
+		assert not tronic.exists
+
+
 	# create foo/baz (NonRDF / binary), from foo
 	def test_create_child_binary(self):
 
@@ -134,6 +179,24 @@ class TestBasicCRUDPUT(object):
 		goober.data = 'this is a test, this is only a test'
 		goober.headers['Content-Type'] = 'text/plain'
 		goober.create(specify_uri=True)
+
+
+	# test alternate response formats for resource get
+	def test_alternate_formats(self):
+
+		# RDF XML
+		foo = repo.get_resource('%s/foo' % testing_container_uri, response_format="application/rdf+xml")
+		assert foo.headers['Content-Type'] == 'application/rdf+xml'
+
+		# Turtle
+		foo = repo.get_resource('%s/foo' % testing_container_uri, response_format="text/turtle")
+		assert foo.headers['Content-Type'] == 'text/turtle'
+
+		# with raw API
+		response = repo.api.http_request('GET', foo.uri, data=None, headers={'Accept':'text/turtle'})
+		assert foo.headers['Content-Type'] == 'text/turtle'
+		response = repo.api.http_request('GET', foo.uri, data=None, headers=None, response_format='text/turtle')
+		assert foo.headers['Content-Type'] == 'text/turtle'
 
 
 
@@ -311,8 +374,98 @@ class TestBasicCRUDPOST(object):
 		assert bc == False
 
 
+	# create POST confirmations
+	def test_bc_post_exceptions(self):
+
+		# test create
+		bc = BasicContainer(repo, '%s' % testing_container_uri)
+		bc.create()
+		bc_uri = bc.uri
+		assert bc.exists
+
+		# create child resource
+		bc1 = BasicContainer(repo, bc.uri)
+		bc1.create()
+		assert bc1.exists
+
+		# 404 - create child at bad location
+		bc2 = BasicContainer(repo, "%s/does/not/exist" % bc.uri)
+		with pytest.raises(Exception) as excinfo:
+			bc2.create()
+		assert 'target location does not exist' in str(excinfo.value)
+
+		# 409 - create resrouce where another exists
+		bc3 = BasicContainer(repo, bc.uri)
+		with pytest.raises(Exception) as excinfo:
+			bc3.create(specify_uri=True)
+		assert 'resource already exists' in str(excinfo.value)
+
+		# 410 - tombstone
+		bc4 = BasicContainer(repo, '%s' % testing_container_uri)
+		bc4.create()
+		bc4.delete(remove_tombstone=False)
+		bc5 = BasicContainer(repo, bc4.uri)
+		with pytest.raises(Exception) as excinfo:
+			bc5.create(specify_uri=True)
+		assert 'tombstone for %s detected' % bc4.uri in str(excinfo.value)
+
+		# test delete
+		bc.delete()
+		bc = repo.get_resource(bc_uri)
+		assert bc == False
 
 
+# test creation and linkages of DirectContainers
+class TestDirectContainer(object):
+
+	def test_create_dc(self):
+
+		# create target goober container
+		goober = BasicContainer(repo, '%s/goober' % testing_container_uri)
+		goober.create(specify_uri=True)
+		assert goober.exists
+
+		# create DirectContainer that relates to goober
+		tronic = DirectContainer(repo, '%s/tronic' % testing_container_uri, membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.knows)
+		tronic.create(specify_uri=True)
+		assert tronic.exists
+
+		# create child to tronic, that goober should then relate to
+		tronic2 = BasicContainer(repo, '%s/tronic/tronic2' % testing_container_uri)
+		tronic2.create(specify_uri=True)
+		assert tronic2.exists
+
+		# finally, assert foaf:knows relation for goober --> tronic2 exists
+		goober.refresh()
+		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.knows)) == tronic2.uri
+
+
+# test creation and linkages of DirectContainers
+class TestIndirectContainer(object):
+
+	def test_create_ic(self):
+
+		# retrieve goober
+		goober = repo.get_resource('goober')
+
+		# retrieve foo
+		foo = repo.get_resource('foo')
+
+		# create IndirectContainer that sets a foaf:based_near relationship from goober to foo
+		ding = IndirectContainer(repo,'%s/ding' % testing_container_uri, membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.based_near, insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
+		ding.create(specify_uri=True)
+		assert ding.exists
+
+		# create child resource to ding
+		dong = BasicContainer(repo,'%s/ding/dong' % testing_container_uri)
+		# add triple that triggers dong's IndirectContainer relationship
+		dong.add_triple(dong.rdf.prefixes.foaf.based_near, foo.uri)
+		dong.create(specify_uri=True)
+		assert dong.exists
+
+		# finally, assert triple from goober --> foaf:based_near --> foo
+		goober.refresh()
+		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.based_near)) == foo.uri
 
 
 

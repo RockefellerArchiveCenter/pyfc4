@@ -29,6 +29,31 @@ def create_demo_resources():
 	foo = BasicContainer(repo, 'foo')
 	foo.create(specify_uri=True)
 
+	# goober
+	global goober
+	goober = BasicContainer(repo, 'goober')
+	goober.create(specify_uri=True)
+
+	# tronic (DirectContainer) --> foaf:knows --> goober, and tronic2 child of tronic
+	global tronic
+	tronic = DirectContainer(repo, 'tronic', membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.knows)
+	tronic.create(specify_uri=True)
+	global tronic2
+	tronic2 = BasicContainer(repo, 'tronic/tronic2')
+	tronic2.create(specify_uri=True)
+
+	# ding (IndirectContainer)
+	global ding
+	ding = IndirectContainer(repo,'ding', membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.based_near, insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
+	ding.create(specify_uri=True)
+	global dong
+	dong = BasicContainer(repo,'ding/dong')
+	dong.add_triple(dong.rdf.prefixes.foaf.based_near, foo.uri)
+	dong.create(specify_uri=True)
+
+	# refresh goober
+	goober.refresh()
+
 	# bar
 	global bar
 	bar = BasicContainer(repo, 'foo/bar')
@@ -41,19 +66,13 @@ def create_demo_resources():
 	baz.binary.mimetype = 'text/plain'
 	baz.create(specify_uri=True)
 
-	return (foo,bar,baz)
-
-
-def get_demo_resources():
-	global foo
-	foo = repo.get_resource('foo')
-	global bar
-	bar = repo.get_resource('foo/bar')
-	global baz
-	baz = repo.get_resource('foo/baz')
-
 
 def delete_demo_resources():
 
-	foo = repo.get_resource('foo')
-	foo.delete()
+	for resource in ['foo','goober','tronic', 'ding']:
+		try:
+			r = repo.get_resource(resource)
+			r.delete()
+		except:
+			logger.debug('could not delete %s' % resource)
+

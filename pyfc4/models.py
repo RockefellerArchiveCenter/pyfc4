@@ -17,14 +17,22 @@ logger.setLevel(logging.DEBUG)
 
 
 
-# Repository
 class Repository(object):
 	
 	'''
 	Class for Fedora Commons 4 (FC4), LDP server instance
+
+	Args:
+		root (str): Full URL of repository REST endpoint (e.g. http://localhost:8080/rest)
+		username (str): username for authorization and roles
+		password (str): password authorziation and roles
+		context (dict): dictionary of namespace prefixes and namespace URIs that propagate to Resources 
+		default_serialization (str): mimetype of default Accept and Content-Type headers
+
+	Attributes:
+		context (dict): Default dictionary of namespace prefixes and namespace URIs
 	'''
 
-	# provide some default namespaces for graph binding
 	context = {
 		'premis':'http://www.loc.gov/premis/rdf/v1#',
 		'test':'info:fedora/test/',
@@ -43,22 +51,20 @@ class Repository(object):
 		'dc':'http://purl.org/dc/elements/1.1/'
 	}
 
-
 	def __init__(self, 
 			root,
 			username,
 			password,
-			context=None,
-			default_response_format='text/turtle'
+			context = None,
+			default_serialization = 'application/rdf+xml'
 		):
 
 		self.root = root
-		# ensure trailing slash
-		if not self.root.endswith('/'):
+		if not self.root.endswith('/'): # ensure trailing slash
 			self.root += '/'
 		self.username = username
 		self.password = password
-		self.default_response_format = default_response_format
+		self.default_serialization = default_serialization
 
 		# API facade
 		self.api = API(self)
@@ -73,6 +79,12 @@ class Repository(object):
 	
 		'''
 		parses and cleans up possible uri inputs, return instance of rdflib.term.URIRef
+
+		Args:
+			uri (rdflib.term.URIRef,str): input URI
+
+		Returns:
+			rdflib.term.URIRef
 		'''
 
 		# no uri provided, assume root
@@ -171,7 +183,7 @@ class API(object):
 			if verb == 'GET':
 				# if no response_format has been requested to this point, use repository instance default
 				if not response_format:
-					response_format = self.repo.default_response_format
+					response_format = self.repo.default_serialization
 				# if headers present, append
 				if headers and 'Accept' not in headers.keys():
 					headers['Accept'] = response_format
@@ -335,7 +347,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None):
 
 		'''
 		when object is created, self.data and self.headers are passed with the requests
@@ -360,9 +372,14 @@ class Resource(object):
 			if type(self) == NonRDFSource:
 				self._prep_binary_data()
 				data = self.binary.data
-			# otherwise, set data as self.rdf.data
+
+			# otherwise, prep for RDF
 			else:
-				data = self.rdf.data
+				# determine serialization
+				if not serialization_format:
+					serialization_format = self.repo.default_serialization
+				data = self.rdf.graph.serialize(format=serialization_format)
+				self.headers['Content-Type'] = serialization_format
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
@@ -388,7 +405,6 @@ class Resource(object):
 			
 			# 410, tombstone present
 			elif response.status_code == 410:
-				logger.debug('tombstone for %s detected, aborting' % self.uri)
 				if ignore_tombstone:
 					response = self.repo.api.http_request('DELETE', '%s/fcr:tombstone' % self.uri)
 					if response.status_code == 204:
@@ -396,6 +412,8 @@ class Resource(object):
 						self.create()
 					else:
 						raise Exception('Could not remove tombstone for %s' % self.uri)
+				else:
+					raise Exception('tombstone for %s detected, aborting' % self.uri)
 
 			# 415, unsupported media type
 			elif response.status_code == 415:
@@ -463,8 +481,11 @@ class Resource(object):
 		# populate prefixes
 		for prefix,uri in self.repo.context.items():
 			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
+		# graph
 		if self.exists:
-			self._parse_graph()
+			self._parse_graph() # parse graph
+		else:
+			self.rdf.graph = rdflib.Graph() # instantiate empty graph
 
 
 	def _parse_graph(self):
@@ -855,7 +876,20 @@ class DirectContainer(Container):
 	When adding children, can also write relationships to another resource
 
 	'''
-	pass
+	
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None):
+
+		# fire parent Container init()
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+
+		# if resource does not yet exist, set rdf:type
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
+
+		# if membershipResource or hasMemberRelation args are set, set triples
+		if membershipResource:
+			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
+		if hasMemberRelation:
+			self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
 
 
 
@@ -867,6 +901,21 @@ class IndirectContainer(Container):
 	An LDPC similar to a LDP-DC that is also capable of having members whose URIs are based on the content of its contained documents rather than the URIs assigned to those documents.
 	https://www.w3.org/TR/ldp/
 	'''
-	pass
+
+	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None, insertedContentRelation=None):
+
+		# fire parent Container init()
+		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+	
+		# if resource does not yet exist, set rdf:type
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.IndirectContainer)
+
+		# if membershipResource, hasMemberRelation, or insertedContentRelation args are set, set triples
+		if membershipResource:
+			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
+		if hasMemberRelation:
+			self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
+		if insertedContentRelation:
+			self.add_triple(self.rdf.prefixes.ldp.insertedContentRelation, insertedContentRelation)
 
 
