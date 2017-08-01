@@ -347,7 +347,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None):
 
 		'''
 		when object is created, self.data and self.headers are passed with the requests
@@ -373,10 +373,13 @@ class Resource(object):
 				self._prep_binary_data()
 				data = self.binary.data
 
-			# otherwise, set data as self.rdf.data
+			# otherwise, prep for RDF
 			else:
-				data = self.rdf.graph.serialize(format=self.repo.default_serialization)
-				self.headers['Content-Type'] = self.repo.default_serialization
+				# determine serialization
+				if not serialization_format:
+					serialization_format = self.repo.default_serialization
+				data = self.rdf.graph.serialize(format=serialization_format)
+				self.headers['Content-Type'] = serialization_format
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
