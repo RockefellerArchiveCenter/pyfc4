@@ -59,7 +59,9 @@ class Repository(object):
 			default_serialization = 'application/rdf+xml'
 		):
 
+		self._root_persist = root
 		self.root = root
+		self.in_txn = False
 		if not self.root.endswith('/'): # ensure trailing slash
 			self.root += '/'
 		self.username = username
@@ -155,6 +157,57 @@ class Repository(object):
 
 		else:
 			raise Exception('error retrieving resource uri %s' % uri)
+
+
+	def start_txn(self):
+
+		'''
+		Request new transaction, parse txn prefix from headers,
+		and set self.root as txn URI.
+		'''
+
+		if not self.in_txn:
+			# request new transaction
+			txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
+
+			# if 201, transaction was created
+			if txn_response.status_code == 201:
+				logger.debug("initiating transaction: %s" % txn_response.headers['Location'])
+				# set self.root with txn prefix
+				self.root = txn_response.headers['Location'] + '/' 
+				# set in_txn flag 
+				self.in_txn = txn_response.headers['Location'] + '/'
+
+			else:
+				raise Exception('could not start transaction')
+
+		else:
+			raise Exception('repository instance currently in transcation: %s' % self.in_txn)
+
+
+	def commit_txn(self):
+
+		'''
+		Commit transaction, return self.root to originally instantiated root
+		'''
+
+		if self.in_txn:
+			# request new transaction
+			txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:commit' % self.root, data=None, headers=None)
+
+			# if 204, transaction was committed
+			if txn_response.status_code == 204:
+				logger.debug("committing transaction: %s" % self.root)
+				# set self.root with txn prefix
+				self.root = self._root_persist
+				# set in_txn flag 
+				self.in_txn = False
+
+			else:
+				raise Exception('could not commit transaction')
+
+		else:
+			raise Exception('repository instance not currently in a transcation')
 
 
 
