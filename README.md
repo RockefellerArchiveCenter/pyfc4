@@ -2,11 +2,12 @@
 
 ![Travis Build](https://travis-ci.org/ghukill/pyfc4.svg?branch=master "Travis Build")
 
-Python 3.5+ client for [Fedora Commons 4.7+](http://fedorarepository.org/).
+Python client for Fedora Commons 4.
 
 ## Requirements
 
   * Python 3.5+
+  * [Fedora Commons 4.7+]((http://fedorarepository.org/))
 
 ## Installation
 

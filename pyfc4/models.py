@@ -8,6 +8,7 @@ import rdflib
 from rdflib.compare import to_isomorphic, graph_diff
 import rdflib_jsonld
 import requests
+import time
 from types import SimpleNamespace
 import uuid
 
@@ -572,6 +573,7 @@ class SparqlUpdate(object):
 		logger.debug(self.update_namespaces)
 
 		# build unique prefixes dictionary
+		# NOTE: can improve by using self.rdf.uris (reverse lookup of self.rdf.prefixes)
 		for ns_uri in self.update_namespaces:
 			for k in self.prefixes.__dict__:
 				if str(ns_uri) == str(self.prefixes.__dict__[k]):
@@ -954,10 +956,12 @@ class Resource(object):
 		self.rdf = SimpleNamespace()
 		self.rdf.data = data
 		self.rdf.prefixes = SimpleNamespace()
+		self.rdf.uris = SimpleNamespace()
 		# populate prefixes
 		for prefix,uri in self.repo.context.items():
 			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
 		# graph
+		self.rdf.triples = SimpleNamespace() # prepare triples
 		self._parse_graph()
 
 
@@ -1003,9 +1007,27 @@ class Resource(object):
 		# conversely, add namespaces from parsed graph to self.rdf.prefixes
 		for ns_prefix, ns_uri in self.rdf.graph.namespaces():
 			setattr(self.rdf.prefixes, ns_prefix, rdflib.Namespace(ns_uri))
+			setattr(self.rdf.uris, rdflib.Namespace(ns_uri), ns_prefix)
 
 		# pin old graph to resource, create copy graph for modifications
 		self.rdf._orig_graph = copy.deepcopy(self.rdf.graph)
+
+		# parse triples as object-like attributes in self.rdf.triples
+		for s,p,o in self.rdf.graph:
+			
+			# get ns info
+			ns_prefix, ns_uri, predicate = self.rdf.graph.compute_qname(p)
+			
+			# if prefix as list not yet added, add
+			if not hasattr(self.rdf.triples, ns_prefix):
+				setattr(self.rdf.triples, ns_prefix, SimpleNamespace())
+
+			# same for predicate
+			if not hasattr(getattr(self.rdf.triples, ns_prefix), predicate):
+				setattr(getattr(self.rdf.triples, ns_prefix), predicate, [])			
+
+			# append object for this prefix
+			getattr(getattr(self.rdf.triples, ns_prefix), predicate).append(o)
 
 
 	def _diff_graph(self):
