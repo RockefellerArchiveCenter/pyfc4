@@ -35,6 +35,7 @@ Assuming an instance of FC4 at `http://localhost:8080/rest`
   * [resource relationships](#resource-relationships)
     * [parents / children](#convenience-methods-for-children--parents)
     * [reading / writing triples](#reading--writing-triples)
+    # [object-like access](#object-like-access)
   * [transactions](#transactions)
 
 
@@ -229,6 +230,36 @@ goober.update()
 for t in goober.triples(p=goober.rdf.prefixes.gn.countryCode):
 	print(t)
 (rdflib.term.URIRef('http://localhost:8080/rest/goober'), rdflib.term.URIRef('http://www.geonames.org/ontology#countryCode'), rdflib.term.Literal('FR'))
+```
+
+##### object-like access
+
+Somewhat of a convenience addition, you can access triples parsed from a resource's graph in an object-like fashion.  For example:
+
+```
+# get ldp:contains 
+In [6]: foo.rdf.triples.ldp.contains
+Out[6]:
+[rdflib.term.URIRef('http://localhost:8080/rest/foo/bar'),
+ rdflib.term.URIRef('http://localhost:8080/rest/foo/baz')]
+
+# In [8]: goober.rdf.triples.foaf.knows
+Out[8]: [rdflib.term.URIRef('http://localhost:8080/rest/tronic/tronic2')]
+
+# a more complete example of how this trickles through
+# add namespace
+In [9]: foo.add_namespace('licorice','http://licorice.org#')
+
+# add triple
+In [10]: foo.add_triple(foo.rdf.prefixes.licorice.best_color, 'black')
+
+# update
+In [11]: foo.update()
+Out[11]: True
+
+# now, object-like access to this triple parsed from graph
+In [12]: foo.rdf.triples.licorice.best_color
+Out[12]: [rdflib.term.Literal('black', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))]
 ```
 
 #### Transactions
