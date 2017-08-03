@@ -651,9 +651,14 @@ class Resource(object):
 
 		response = self.repo.api.http_request('HEAD', self.uri)
 		self.status_code = response.status_code
+		# resource exists
 		if self.status_code == 200:
 			self.exists = True
-		if self.status_code == 404:
+		# resource no longer here
+		elif self.status_code == 410:
+			self.exists = False
+		# resource not found
+		elif self.status_code == 404:
 			self.exists = False
 		return self.exists
 
@@ -749,6 +754,79 @@ class Resource(object):
 
 		# if all goes well, return True
 		return True
+
+
+	def options(self):
+
+		'''
+		Small method to return headers of an OPTIONS request to self.uri
+
+		Args:
+			None
+
+		Return:
+			(dict) response headers from OPTIONS request
+		'''
+
+		# http request
+		response = self.repo.api.http_request('OPTIONS', self.uri)
+		return response.headers
+
+
+	def move(self, destination, remove_tombstone=True):
+
+		'''
+		Method to move resource to another location.
+		Note: by default, this leaves a tombstone.  Can use optional flag remove_tombstone to remove on successful move.
+
+		Args:
+			destination (rdflib.term.URIRef, str): URI location to move resource
+
+		Returns:
+			(Resource) new, moved instance of resource
+		'''
+
+		# set move headers
+		destination_uri = self.repo.parse_uri(destination)
+
+		# http request
+		response = self.repo.api.http_request('MOVE', self.uri, data=None, headers={'Destination':destination_uri.toPython()})
+
+		# handle response
+		if response.status_code == 201:
+			# set self exists
+			self.exists = False
+			# handle tombstone
+			if remove_tombstone:
+				tombstone_response = self.repo.api.http_request('DELETE', "%s/fcr:tombstone" % self.uri)
+			return destination_uri
+		else:
+			raise Exception('could not move resource %s to %s' % (self.uri, destination_uri))
+
+
+	def copy(self, destination):
+
+		'''
+		Method to copy resource to another location
+
+		Args:
+			destination (rdflib.term.URIRef, str): URI location to move resource
+
+		Returns:
+			(Resource) new, moved instance of resource
+		'''
+
+		# set move headers
+		destination_uri = self.repo.parse_uri(destination)
+
+		# http request
+		response = self.repo.api.http_request('COPY', self.uri, data=None, headers={'Destination':destination_uri.toPython()})
+
+		# handle response
+		if response.status_code == 201:
+			return destination_uri
+		else:
+			raise Exception('could not move resource %s to %s' % (self.uri, destination_uri))
 
 
 	def delete(self, remove_tombstone=True):

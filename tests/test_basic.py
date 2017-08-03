@@ -468,6 +468,7 @@ class TestIndirectContainer(object):
 		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.based_near)) == foo.uri
 
 
+# test basic transactions
 class TestTransaction(object):
 
 	def test_transactions_CRUD(self):
@@ -495,6 +496,36 @@ class TestTransaction(object):
 		assert repo.rollback_txn()
 
 
+# test moving/copying
+class TestMovingCopying(object):
+
+	def test_move_resource(self):
+
+		# create new resource to move
+		ephem = BasicContainer(repo, '%s/ephem' % testing_container_uri)
+		ephem.create(specify_uri=True)
+		assert ephem.exists
+
+		# move resource, and capture as new resource
+		ephem2 = repo.get_resource(ephem.move('%s/ephem2' % testing_container_uri))
+
+		# test
+		assert not ephem.exists
+		assert ephem2.exists
+
+
+	def test_copy_resource(self):
+
+		# grab ephem2
+		ephem2 = repo.get_resource('%s/ephem2' % testing_container_uri)
+
+		# copy to ephem3
+		ephem3 = repo.get_resource(ephem2.copy('%s/ephem3' % testing_container_uri))
+
+		# test
+		assert ephem2.exists
+		assert ephem3.exists
+		
 
 
 
