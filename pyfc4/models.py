@@ -216,7 +216,7 @@ class Repository(object):
 			return txn
 
 
-	def get_txn(self, txn_uri, txn_name):
+	def get_txn(self, txn_name, txn_uri):
 
 		'''
 		Retrieves known transaction and adds to self.txns.
@@ -256,7 +256,7 @@ class Repository(object):
 			return txn
 
 		# if 404, transaction does not exist
-		elif txn_response.status_code == 404:
+		elif txn_response.status_code in [404, 410]:
 			logger.debug("transaction does not exist: %s" % txn_uri)
 			return False
 
@@ -275,7 +275,9 @@ class Transaction(Repository):
 		Repository
 
 	Args:
-		txn_name (str): provided at init
+		txn_name (str): human name for transaction
+		txn_uri (rdflib.term.URIRef, str): URI of transaction, also to be used as Transaction root path
+		expires (str): expires information from headers
 	'''
 
 	def __init__(self, 
@@ -298,21 +300,13 @@ class Transaction(Repository):
 		self.expires = expires
 
 		# txn status
-		self.exists = True
-
-
-	def check_exists(self):
-
-		'''
-		Method to confirm that transaction exists, update as necessary
-		'''
-		pass
+		self.active = True
 
 
 	def keep_alive(self):
 
 		'''
-		Keep current transaction alive.
+		Keep current transaction alive, updates self.expires
 
 		Args:
 			None
@@ -322,98 +316,88 @@ class Transaction(Repository):
 		'''
 
 		# keep transaction alive
-		txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
+		txn_response = self.api.http_request('POST','%sfcr:tx' % self.root, data=None, headers=None)
 
 		# if 204, transaction kept alive
 		if txn_response.status_code == 204:
 			logger.debug("continuing transaction: %s" % self.root)
-			# update timer
+			# update status and timer
+			self.active = True
 			self.expires = txn_response.headers['Expires']
 			return  True
 
 		# if 410, transaction does not exist
 		elif txn_response.status_code == 410:
 			logger.debug("transaction does not exist: %s" % self.root)
+			self.active = False
 			return False
 
 		else:
 			raise Exception('could not continue transaction')
 
 
-	# def commit(self):
+	def _close(self, close_type):
 
-	# 	'''
-	# 	Commit transaction, all changes saved, return self.root to originally instantiated root
+		'''
+		Ends transaction by committing, or rolling back, all changes during transaction.
 
-	# 	Args:
-	# 		None
+		Args:
+			close_type (str): expects "commit" or "rollback"
 		
-	# 	Return:
-	# 		(bool)
-	# 	'''
+		Return:
+			(bool)
+		'''
 
-	# 	if self.in_txn:
-	# 		# commit transaction
-	# 		txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:commit' % self.root, data=None, headers=None)
+		# commit transaction
+		txn_response = self.api.http_request('POST','%sfcr:tx/fcr:%s' % (self.root, close_type), data=None, headers=None)
 
-	# 		# if 204, transaction was committed
-	# 		if txn_response.status_code == 204:
-	# 			logger.debug("committing transaction: %s" % self.root)
-	# 			# set self.root with txn prefix
-	# 			self.root = self._root_persist
-	# 			# set in_txn flag 
-	# 			self.in_txn = False
-	# 			# return
-	# 			return True
+		# if 204, transaction was closed
+		if txn_response.status_code == 204:
+			logger.debug("%s for transaction: %s, successful" % (close_type, self.root))
+			# update self.active
+			self.active = False
+			# return
+			return True
 
-	# 		# if 410, transaction does not exist
-	# 		elif txn_response.status_code == 410:
-	# 			logger.debug("transaction does not exist: %s" % self.root)
-	# 			return False
+		# if 410 or 404, transaction does not exist
+		elif txn_response.status_code in [404, 410]:
+			logger.debug("transaction does not exist: %s" % self.root)
+			# update self.active
+			self.active = False
+			return False
 
-	# 		else:
-	# 			raise Exception('could not commit transaction')
-
-	# 	else:
-	# 		raise Exception('repository instance not currently in a transcation')
+		else:
+			raise Exception('could not commit transaction')
 
 
-	# def rollback(self):
+	def commit(self):
 
-	# 	'''
-	# 	Rollback transaction, no changes are made, return self.root to originally instantiated root
+		'''
+		Fire self._close() method
 
-	# 	Args:
-	# 		None
-		
-	# 	Return:
-	# 		None
-	# 	'''
+		Args:
+			None
+		Returns:
+			bool
+		'''
 
-	# 	if self.in_txn:
-	# 		# rollback transaction
-	# 		txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:rollback' % self.root, data=None, headers=None)
+		# fire _close method
+		return self._close('commit')
 
-	# 		# if 204, transaction was committed
-	# 		if txn_response.status_code == 204:
-	# 			logger.debug("committing transaction: %s" % self.root)
-	# 			# set self.root with txn prefix
-	# 			self.root = self._root_persist
-	# 			# set in_txn flag 
-	# 			self.in_txn = False
-	# 			# return 
-	# 			return True
 
-	# 		# if 410, transaction does not exist
-	# 		elif txn_response.status_code == 410:
-	# 			logger.debug("transaction does not exist: %s" % self.root)
-	# 			return False
+	def rollback(self):
 
-	# 		else:
-	# 			raise Exception('could not commit transaction')
+		'''
+		Fire self._close() method
 
-	# 	else:
-	# 		raise Exception('repository instance not currently in a transcation')
+		Args:
+			None
+		Returns:
+			bool
+		'''
+
+		# fire _close method
+		return self._close('rollback')
 
 
 
