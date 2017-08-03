@@ -232,7 +232,7 @@ for t in goober.triples(p=goober.rdf.prefixes.gn.countryCode):
 (rdflib.term.URIRef('http://localhost:8080/rest/goober'), rdflib.term.URIRef('http://www.geonames.org/ontology#countryCode'), rdflib.term.Literal('FR'))
 ```
 
-##### object-like access
+##### Object-like access
 
 Somewhat of a convenience addition, you can access triples parsed from a resource's graph in an object-like fashion.  For example:
 
