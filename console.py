@@ -21,6 +21,11 @@ repo = Repository('http://localhost:8080/rest','username','password', context={'
 The following functions are created entirely for convenience/testing purposes.
 '''
 
+# fast get
+def get(uri):
+	return repo.get_resource(uri)
+	
+
 # demo resources
 def create_demo_resources():
 

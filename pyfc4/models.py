@@ -114,7 +114,7 @@ class Repository(object):
 			return uri
 
 
-	def create_resource(self, uri=None, resource_type=None):
+	def create_resource(self, resource_type=None, uri=None,):
 
 		'''
 		Convenience method for creating a new resource
@@ -1249,6 +1249,80 @@ class Resource(object):
 			return True
 
 
+	def children(self, as_resources=False):
+
+		'''
+		method to return hierarchical  children of this resource
+
+		Args:
+			as_resources (bool): if True, opens each as appropriate resource type instead of return URI only
+
+		Returns:
+			(list): list of resources
+		'''
+
+		children = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving children as resources')
+			children = [ self.repo.get_resource(child) for child in children ]
+
+		return children
+
+
+	def parents(self, as_resources=False):
+
+		'''
+		method to return hierarchical parents of this resource
+
+		Args:
+			as_resources (bool): if True, opens each as appropriate resource type instead of return URI only
+
+		Returns:
+			(list): list of resources
+		'''
+
+		parents = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving parent as resource')
+			parents = [ self.repo.get_resource(parent) for parent in parents ]
+
+		return parents
+
+
+	def siblings(self, as_resources=False):
+
+		'''
+		method to return hierarchical siblings of this resource.
+
+		Args:
+			as_resources (bool): if True, opens each as appropriate resource type instead of return URI only
+
+		Returns:
+			(list): list of resources
+		'''
+
+		siblings = set()
+
+		# loop through parents and get children
+		for parent in self.parents(as_resources=True):
+			for sibling in parent.children(as_resources=as_resources):				
+				siblings.add(sibling)
+
+		# remove self
+		if as_resources:
+			siblings.remove(self)
+		if not as_resources:
+			siblings.remove(self.uri)
+
+		return list(siblings)
+
+
+
+
 
 # NonRDF Source
 class NonRDFSource(Resource):
@@ -1448,38 +1522,6 @@ class Container(RDFResource):
 		
 		# fire parent RDFResource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
-
-
-	def children(self, as_resources=False):
-
-		'''
-		method to return children of this resource
-		'''
-
-		children = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
-
-		# if as_resources, issue GET requests for children and return
-		if as_resources:
-			logger.debug('retrieving children as resources')
-			children = [ self.repo.get_resource(child) for child in children ]
-
-		return children
-
-
-	def parents(self, as_resources=False):
-
-		'''
-		method to return parent of this resource
-		'''
-
-		parents = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
-
-		# if as_resources, issue GET requests for children and return
-		if as_resources:
-			logger.debug('retrieving parent as resource')
-			parents = [ self.repo.get_resource(parent) for parent in parents ]
-
-		return parents
 
 
 

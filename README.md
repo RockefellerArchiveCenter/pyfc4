@@ -24,6 +24,8 @@ Requires `pyfc4` installed as module, and without any configuration, an instance
 
 ## Basic Usage
 
+Assuming an instance of FC4 at `http://localhost:8080/rest`
+
   * [establishing repository connection](#instantiate-repository-handle)
   * creating resources
     * [RDF](#create-rdf-resources)
@@ -34,7 +36,6 @@ Requires `pyfc4` installed as module, and without any configuration, an instance
     * [reading / writing triples](#reading--writing-triples)
   * [transactions](#transactions)
 
-Assuming an instance of FC4 at `http://localhost:8080/rest`
 
 #### Instantiate repository handle
 ```
