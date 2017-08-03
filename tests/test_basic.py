@@ -415,6 +415,7 @@ class TestBasicCRUDPOST(object):
 		assert bc == False
 
 
+
 # test creation and linkages of DirectContainers
 class TestDirectContainer(object):
 
@@ -438,6 +439,7 @@ class TestDirectContainer(object):
 		# finally, assert foaf:knows relation for goober --> tronic2 exists
 		goober.refresh()
 		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.knows)) == tronic2.uri
+
 
 
 # test creation and linkages of DirectContainers
@@ -468,32 +470,45 @@ class TestIndirectContainer(object):
 		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.based_near)) == foo.uri
 
 
+
 # test basic transactions
-class TestTransaction(object):
+class TestTransactions(object):
 
 	def test_transactions_CRUD(self):
 
-		# create transaction from repo instance
-		assert repo.start_txn()
-		txn_uri = repo.root
+		# start new transaction, 'zing'
+		zing = repo.start_txn('zing')
+		assert zing.active
 
-		# continue transaction
-		assert repo.continue_txn()
+		# retrieve this transaction as another name
+		zinger = repo.get_txn('zinger', zing.root)
+		assert zinger.active
 
-		# retrieve known transaction
-		new_repo = Repository('http://localhost:8080/rest','admin','username')
-		assert new_repo.get_txn(txn_uri)
+		# create bc in zing
+		zingfoo = BasicContainer(zing, '%s/zingfoo' % testing_container_uri)
+		zingfoo.create(specify_uri=True)
+		assert zingfoo.exists
 
-		# attempt transaction that does not exist
-		new_repo2 = Repository('http://localhost:8080/rest','admin','username')
-		assert not new_repo2.get_txn('does_not_exist')
+		# commit zing and test for commit of zingfoo
+		zing.commit()
+		assert not zing.active # not active any longer
+		zingfoo = repo.get_resource('%s/zingfoo' % testing_container_uri)
+		assert zingfoo.exists
 
-		# commit txn
-		assert repo.commit_txn()
+		# begin new, unnamed txn
+		txn = repo.start_txn()
+		assert txn.active
 
-		# roll back txn
-		repo.start_txn()
-		assert repo.rollback_txn()
+		# create zingfoo2 in txn
+		zingfoo2 = BasicContainer(txn, '%s/zingfoo2' % testing_container_uri)
+		zingfoo2.create(specify_uri=True)
+		assert zingfoo2.exists
+
+		# but, rollback and confirm not committed
+		txn.rollback()
+		zingfoo2 = repo.get_resource('%s/zingfoo2' % testing_container_uri)
+		assert not zingfoo2
+
 
 
 # test moving/copying
@@ -526,8 +541,6 @@ class TestMovingCopying(object):
 		assert ephem2.exists
 		assert ephem3.exists
 		
-
-
 
 
 ########################################################
