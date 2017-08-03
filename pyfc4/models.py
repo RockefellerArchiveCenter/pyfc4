@@ -56,12 +56,14 @@ class Repository(object):
 			username,
 			password,
 			context = None,
-			default_serialization = 'application/rdf+xml'
+			default_serialization = 'application/rdf+xml',
+			as_txn_uri = None
 		):
 
 		self.root = root
 		if not self.root.endswith('/'): # ensure trailing slash
 			self.root += '/'
+		self._root_persist = self.root
 		self.username = username
 		self.password = password
 		self.default_serialization = default_serialization
@@ -74,8 +76,15 @@ class Repository(object):
 			logger.debug('context provided, merging with defaults')
 			self.context.update(context)
 
+		# transaction
+		self.in_txn = False
 
-	def parse_uri(self, uri):
+		# if as_txn_uri is provided, attempt to retrieve and set transaction
+		if as_txn_uri:
+			self.get_txn(as_txn_uri)
+
+
+	def parse_uri(self, uri, use_non_txn_root=False):
 	
 		'''
 		parses and cleans up possible uri inputs, return instance of rdflib.term.URIRef
@@ -87,16 +96,22 @@ class Repository(object):
 			rdflib.term.URIRef
 		'''
 
+		# if use_non_txn_root, use original persisted root
+		if use_non_txn_root:
+			root = self._root_persist
+		else:
+			root = self.root
+
 		# no uri provided, assume root
 		if not uri:
-			return rdflib.term.URIRef(self.root)
+			return rdflib.term.URIRef(root)
 
 		# string uri provided
 		elif type(uri) == str:
 
-			# assume "short" uri, expand with repo.root
+			# assume "short" uri, expand with repo root
 			if type(uri) == str and not uri.startswith('http'):
-				return rdflib.term.URIRef("%s%s" % (self.root, uri))
+				return rdflib.term.URIRef("%s%s" % (root, uri))
 
 			# else, assume full uri
 			else:
@@ -141,13 +156,205 @@ class Repository(object):
 			logger.debug('using resource type: %s' % resource_type)
 
 			# fire GET request
-			get_response = self.api.http_request('GET', "%s/fcr:metadata" % uri, response_format=response_format)
+			get_response = self.api.http_request(
+				'GET',
+				"%s/fcr:metadata" % uri,
+				response_format=response_format)
 
 			# fire request
-			return resource_type(self, uri, data=get_response.content, headers=get_response.headers, status_code=get_response.status_code)
+			return resource_type(self,
+				uri,
+				data=get_response.content,
+				headers=get_response.headers,
+				status_code=get_response.status_code)
 
 		else:
 			raise Exception('error retrieving resource uri %s' % uri)
+
+
+	def get_txn(self, txn_uri):
+
+		'''
+		Retrieve transaction, parse txn prefix from headers,
+		and set self.root as txn URI.
+
+		Args:
+			txn_prefix (str, rdflib.term.URIRef): uri of the transaction. e.g. http://localhost:8080/rest/txn:123456789
+		
+		Return:
+			None
+		'''
+
+		# parse uri
+		txn_uri = self.parse_uri(txn_uri, use_non_txn_root=True)
+
+		# request new transaction
+		txn_response = self.api.http_request('GET',txn_uri, data=None, headers=None)
+
+		# if 201, transaction was created
+		if txn_response.status_code == 200:
+			logger.debug("transactoin found: %s" % txn_uri)
+			# set self.root with txn prefix
+			if not txn_uri.endswith('/'): # ensure trailing slash
+				txn_uri += '/'
+			self.root = txn_uri
+			# set in_txn flag 
+			self.in_txn = txn_uri
+			return True
+
+		# if 410, transaction does not exist
+		elif txn_response.status_code == 404:
+			logger.debug("transaction does not exist: %s" % self.root)
+			return False
+
+		else:
+			raise Exception('could not start transaction')
+
+
+	def start_txn(self):
+
+		'''
+		Request new transaction, parse txn prefix from headers,
+		and set self.root as txn URI.
+
+		Args:
+			None
+		
+		Return:
+			None
+		'''
+
+		if not self.in_txn:
+			# request new transaction
+			txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
+
+			# if 201, transaction was created
+			if txn_response.status_code == 201:
+				txn_uri = txn_response.headers['Location']
+				logger.debug("initiating transaction: %s" % txn_uri)
+				# set self.root with txn prefix
+				if not txn_uri.endswith('/'): # ensure trailing slash
+					txn_uri += '/'
+				self.root = txn_uri 
+				# set in_txn flag 
+				self.in_txn = txn_uri
+				return True
+
+			else:
+				raise Exception('could not start transaction')
+
+		else:
+			raise Exception('repository instance currently in transcation: %s' % self.in_txn)
+
+
+	def continue_txn(self):
+
+		'''
+		Keep current transaction alive
+
+		Args:
+			None
+
+		Return:
+			None
+		'''
+
+		if self.in_txn:
+
+			# keep transaction alive
+			txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
+
+			# if 204, transaction kept alive
+			if txn_response.status_code == 204:
+				logger.debug("continuing transaction: %s" % self.root)
+				return  True
+
+			# if 410, transaction does not exist
+			elif txn_response.status_code == 410:
+				logger.debug("transaction does not exist: %s" % self.root)
+				return False
+
+			else:
+				raise Exception('could not continue transaction')
+
+		else:
+			raise Exception('repository instance not currently in a transcation')
+
+
+	def commit_txn(self):
+
+		'''
+		Commit transaction, all changes saved, return self.root to originally instantiated root
+
+		Args:
+			None
+		
+		Return:
+			(bool)
+		'''
+
+		if self.in_txn:
+			# commit transaction
+			txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:commit' % self.root, data=None, headers=None)
+
+			# if 204, transaction was committed
+			if txn_response.status_code == 204:
+				logger.debug("committing transaction: %s" % self.root)
+				# set self.root with txn prefix
+				self.root = self._root_persist
+				# set in_txn flag 
+				self.in_txn = False
+				# return
+				return True
+
+			# if 410, transaction does not exist
+			elif txn_response.status_code == 410:
+				logger.debug("transaction does not exist: %s" % self.root)
+				return False
+
+			else:
+				raise Exception('could not commit transaction')
+
+		else:
+			raise Exception('repository instance not currently in a transcation')
+
+
+	def rollback_txn(self):
+
+		'''
+		Rollback transaction, no changes are made, return self.root to originally instantiated root
+
+		Args:
+			None
+		
+		Return:
+			None
+		'''
+
+		if self.in_txn:
+			# rollback transaction
+			txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:rollback' % self.root, data=None, headers=None)
+
+			# if 204, transaction was committed
+			if txn_response.status_code == 204:
+				logger.debug("committing transaction: %s" % self.root)
+				# set self.root with txn prefix
+				self.root = self._root_persist
+				# set in_txn flag 
+				self.in_txn = False
+				# return 
+				return True
+
+			# if 410, transaction does not exist
+			elif txn_response.status_code == 410:
+				logger.debug("transaction does not exist: %s" % self.root)
+				return False
+
+			else:
+				raise Exception('could not commit transaction')
+
+		else:
+			raise Exception('repository instance not currently in a transcation')
 
 
 
@@ -222,7 +429,8 @@ class API(object):
 		if type(uri) == rdflib.term.URIRef:
 			uri = uri.toPython()
 
-		logger.debug("%s request for %s, format %s, headers %s" % (verb, uri, response_format, headers))
+		logger.debug("%s request for %s, format %s, headers %s" % 
+			(verb, uri, response_format, headers))
 
 		# manually prepare request
 		session = requests.Session()
@@ -247,7 +455,10 @@ class API(object):
 		'''
 		
 		# parse 'Link' header
-		links = [link.split(";")[0] for link in response.headers['Link'].split(', ') if link.startswith('<http://www.w3.org/ns/ldp#')]
+		links = [
+			link.split(";")[0]
+			for link in response.headers['Link'].split(', ')
+			if link.startswith('<http://www.w3.org/ns/ldp#')]
 		logger.debug('parsed Link headers: %s' % links)
 		
 		# with LDP types in hand, select appropriate resource type
@@ -386,7 +597,13 @@ class Resource(object):
 		rdf_prefixes_mixins (dict): optional rdf prefixes and namespaces
 	'''
 	
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, rdf_prefixes_mixins=None):
+	def __init__(self,
+		repo,
+		uri=None,
+		data=None,
+		headers={},
+		status_code=None,
+		rdf_prefixes_mixins=None):
 
 		# repository handle is pinned to resource instance here
 		self.repo = repo
@@ -434,9 +651,14 @@ class Resource(object):
 
 		response = self.repo.api.http_request('HEAD', self.uri)
 		self.status_code = response.status_code
+		# resource exists
 		if self.status_code == 200:
 			self.exists = True
-		if self.status_code == 404:
+		# resource no longer here
+		elif self.status_code == 410:
+			self.exists = False
+		# resource not found
+		elif self.status_code == 404:
 			self.exists = False
 		return self.exists
 
@@ -532,6 +754,79 @@ class Resource(object):
 
 		# if all goes well, return True
 		return True
+
+
+	def options(self):
+
+		'''
+		Small method to return headers of an OPTIONS request to self.uri
+
+		Args:
+			None
+
+		Return:
+			(dict) response headers from OPTIONS request
+		'''
+
+		# http request
+		response = self.repo.api.http_request('OPTIONS', self.uri)
+		return response.headers
+
+
+	def move(self, destination, remove_tombstone=True):
+
+		'''
+		Method to move resource to another location.
+		Note: by default, this leaves a tombstone.  Can use optional flag remove_tombstone to remove on successful move.
+
+		Args:
+			destination (rdflib.term.URIRef, str): URI location to move resource
+
+		Returns:
+			(Resource) new, moved instance of resource
+		'''
+
+		# set move headers
+		destination_uri = self.repo.parse_uri(destination)
+
+		# http request
+		response = self.repo.api.http_request('MOVE', self.uri, data=None, headers={'Destination':destination_uri.toPython()})
+
+		# handle response
+		if response.status_code == 201:
+			# set self exists
+			self.exists = False
+			# handle tombstone
+			if remove_tombstone:
+				tombstone_response = self.repo.api.http_request('DELETE', "%s/fcr:tombstone" % self.uri)
+			return destination_uri
+		else:
+			raise Exception('could not move resource %s to %s' % (self.uri, destination_uri))
+
+
+	def copy(self, destination):
+
+		'''
+		Method to copy resource to another location
+
+		Args:
+			destination (rdflib.term.URIRef, str): URI location to move resource
+
+		Returns:
+			(Resource) new, moved instance of resource
+		'''
+
+		# set move headers
+		destination_uri = self.repo.parse_uri(destination)
+
+		# http request
+		response = self.repo.api.http_request('COPY', self.uri, data=None, headers={'Destination':destination_uri.toPython()})
+
+		# handle response
+		if response.status_code == 201:
+			return destination_uri
+		else:
+			raise Exception('could not move resource %s to %s' % (self.uri, destination_uri))
 
 
 	def delete(self, remove_tombstone=True):
@@ -642,7 +937,9 @@ class Resource(object):
 				parse_format = parse_format.split(';')[0]
 			
 			# parse graph	
-			self.rdf.graph = rdflib.Graph().parse(data=self.rdf.data.decode('utf-8'), format=parse_format)
+			self.rdf.graph = rdflib.Graph().parse(
+				data=self.rdf.data.decode('utf-8'),
+				format=parse_format)
 
 		# else, create empty graph
 		else:
@@ -682,7 +979,9 @@ class Resource(object):
 			None: sets self.rdf.diffs and adds the three graphs mentioned, 'overlap', 'removed', and 'added'
 		'''
 
-		overlap, removed, added = graph_diff(to_isomorphic(self.rdf._orig_graph), to_isomorphic(self.rdf.graph))
+		overlap, removed, added = graph_diff(
+			to_isomorphic(self.rdf._orig_graph),
+			to_isomorphic(self.rdf.graph))
 		diffs = SimpleNamespace()
 		diffs.overlap = overlap
 		diffs.removed = removed
@@ -878,13 +1177,21 @@ class Resource(object):
 		sq = SparqlUpdate(self.rdf.prefixes, self.rdf.diffs)
 		if sparql_query_only:
 			return sq.build_query()
-		response = self.repo.api.http_request('PATCH', self.uri, data=sq.build_query(), headers={'Content-Type':'application/sparql-update'})
+		response = self.repo.api.http_request(
+			'PATCH',
+			self.uri,
+			data=sq.build_query(),
+			headers={'Content-Type':'application/sparql-update'})
 
 		# if NonRDFSource, update binary as well
 		if type(self) == NonRDFSource:
 			self._prep_binary_data()
 			binary_data = self.binary.data
-			binary_response = self.repo.api.http_request('PUT', self.uri, data=binary_data, headers={'Content-Type':self.binary.mimetype})
+			binary_response = self.repo.api.http_request(
+				'PUT',
+				self.uri,
+				data=binary_data,
+				headers={'Content-Type':self.binary.mimetype})
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
@@ -931,8 +1238,16 @@ class NonRDFSource(Resource):
 		if self.exists:
 
 			# get mimetype
-			self.binary.mimetype = self.rdf.graph.value(self.uri, self.rdf.prefixes.ebucore.hasMimeType).toPython()
-			self.binary.data = self.repo.api.http_request('GET', self.uri, data=None, headers={'Content-Type':self.binary.mimetype}, is_rdf=False, stream=True).content
+			self.binary.mimetype = self.rdf.graph.value(
+				self.uri,
+				self.rdf.prefixes.ebucore.hasMimeType).toPython()
+			self.binary.data = self.repo.api.http_request(
+				'GET',
+				self.uri,
+				data=None,
+				headers={'Content-Type':self.binary.mimetype},
+				is_rdf=False,
+				stream=True).content
 
 
 	def _prep_binary_data(self):
@@ -975,7 +1290,8 @@ class NonRDFSource(Resource):
 		
 		# mimetype, no Content-Type
 		elif self.binary.mimetype and 'Content-Type' not in self.headers.keys():
-			logger.debug('setting Content-Type header with provided mimetype: %s' % self.binary.mimetype)
+			logger.debug('setting Content-Type header with provided mimetype: %s'
+				% self.binary.mimetype)
 			self.headers['Content-Type'] = self.binary.mimetype
 
 
@@ -1169,7 +1485,14 @@ class DirectContainer(Container):
 		hasMemberRelation (rdflib.term.URIRef): predicate that will be used when pointing from URI in ldp:membershipResource to children
 	'''
 	
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None):
+	def __init__(self,
+		repo,
+		uri=None,
+		data=None,
+		headers={},
+		status_code=None,
+		membershipResource=None,
+		hasMemberRelation=None):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
@@ -1207,7 +1530,15 @@ class IndirectContainer(Container):
 		insertedContentRelation (rdflib.term): destination for ldp:hasMemberRelation from ldp:membershipResource
 	'''
 
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None, membershipResource=None, hasMemberRelation=None, insertedContentRelation=None):
+	def __init__(self,
+		repo,
+		uri=None,
+		data=None,
+		headers={},
+		status_code=None,
+		membershipResource=None,
+		hasMemberRelation=None,
+		insertedContentRelation=None):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
