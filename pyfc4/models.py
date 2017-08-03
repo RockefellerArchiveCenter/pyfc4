@@ -8,6 +8,7 @@ import rdflib
 from rdflib.compare import to_isomorphic, graph_diff
 import rdflib_jsonld
 import requests
+import time
 from types import SimpleNamespace
 import uuid
 
@@ -114,16 +115,23 @@ class Repository(object):
 			return uri
 
 
-	def create_resource(self, uri, resource_type):
+	def create_resource(self, resource_type=None, uri=None,):
 
 		'''
 		Convenience method for creating a new resource
 
 		Args:
+			uri (rdflib.term.URIRef, str): uri of resource to create
+			resource_type (NonRDFSource (Binary), BasicContainer, DirectContainer, IndirectContainer):  resource type to create
 
 		Returns:
+			(NonRDFSource (Binary), BasicContainer, DirectContainer, IndirectContainer): instance of appropriate type
 		'''
-		pass
+
+		if resource_type:
+			return resource_type(self, uri)
+		else:
+			raise Exception("please provide class of resource type")
 
 
 	def get_resource(self, uri, response_format=None):
@@ -565,6 +573,7 @@ class SparqlUpdate(object):
 		logger.debug(self.update_namespaces)
 
 		# build unique prefixes dictionary
+		# NOTE: can improve by using self.rdf.uris (reverse lookup of self.rdf.prefixes)
 		for ns_uri in self.update_namespaces:
 			for k in self.prefixes.__dict__:
 				if str(ns_uri) == str(self.prefixes.__dict__[k]):
@@ -947,10 +956,12 @@ class Resource(object):
 		self.rdf = SimpleNamespace()
 		self.rdf.data = data
 		self.rdf.prefixes = SimpleNamespace()
+		self.rdf.uris = SimpleNamespace()
 		# populate prefixes
 		for prefix,uri in self.repo.context.items():
 			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
 		# graph
+		self.rdf.triples = SimpleNamespace() # prepare triples
 		self._parse_graph()
 
 
@@ -996,9 +1007,27 @@ class Resource(object):
 		# conversely, add namespaces from parsed graph to self.rdf.prefixes
 		for ns_prefix, ns_uri in self.rdf.graph.namespaces():
 			setattr(self.rdf.prefixes, ns_prefix, rdflib.Namespace(ns_uri))
+			setattr(self.rdf.uris, rdflib.Namespace(ns_uri), ns_prefix)
 
 		# pin old graph to resource, create copy graph for modifications
 		self.rdf._orig_graph = copy.deepcopy(self.rdf.graph)
+
+		# parse triples as object-like attributes in self.rdf.triples
+		for s,p,o in self.rdf.graph:
+			
+			# get ns info
+			ns_prefix, ns_uri, predicate = self.rdf.graph.compute_qname(p)
+			
+			# if prefix as list not yet added, add
+			if not hasattr(self.rdf.triples, ns_prefix):
+				setattr(self.rdf.triples, ns_prefix, SimpleNamespace())
+
+			# same for predicate
+			if not hasattr(getattr(self.rdf.triples, ns_prefix), predicate):
+				setattr(getattr(self.rdf.triples, ns_prefix), predicate, [])			
+
+			# append object for this prefix
+			getattr(getattr(self.rdf.triples, ns_prefix), predicate).append(o)
 
 
 	def _diff_graph(self):
@@ -1242,6 +1271,80 @@ class Resource(object):
 			return True
 
 
+	def children(self, as_resources=False):
+
+		'''
+		method to return hierarchical  children of this resource
+
+		Args:
+			as_resources (bool): if True, opens each as appropriate resource type instead of return URI only
+
+		Returns:
+			(list): list of resources
+		'''
+
+		children = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving children as resources')
+			children = [ self.repo.get_resource(child) for child in children ]
+
+		return children
+
+
+	def parents(self, as_resources=False):
+
+		'''
+		method to return hierarchical parents of this resource
+
+		Args:
+			as_resources (bool): if True, opens each as appropriate resource type instead of return URI only
+
+		Returns:
+			(list): list of resources
+		'''
+
+		parents = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
+
+		# if as_resources, issue GET requests for children and return
+		if as_resources:
+			logger.debug('retrieving parent as resource')
+			parents = [ self.repo.get_resource(parent) for parent in parents ]
+
+		return parents
+
+
+	def siblings(self, as_resources=False):
+
+		'''
+		method to return hierarchical siblings of this resource.
+
+		Args:
+			as_resources (bool): if True, opens each as appropriate resource type instead of return URI only
+
+		Returns:
+			(list): list of resources
+		'''
+
+		siblings = set()
+
+		# loop through parents and get children
+		for parent in self.parents(as_resources=True):
+			for sibling in parent.children(as_resources=as_resources):				
+				siblings.add(sibling)
+
+		# remove self
+		if as_resources:
+			siblings.remove(self)
+		if not as_resources:
+			siblings.remove(self.uri)
+
+		return list(siblings)
+
+
+
+
 
 # NonRDF Source
 class NonRDFSource(Resource):
@@ -1441,38 +1544,6 @@ class Container(RDFResource):
 		
 		# fire parent RDFResource init()
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
-
-
-	def children(self, as_resources=False):
-
-		'''
-		method to return children of this resource
-		'''
-
-		children = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.ldp.contains, None))]
-
-		# if as_resources, issue GET requests for children and return
-		if as_resources:
-			logger.debug('retrieving children as resources')
-			children = [ self.repo.get_resource(child) for child in children ]
-
-		return children
-
-
-	def parents(self, as_resources=False):
-
-		'''
-		method to return parent of this resource
-		'''
-
-		parents = [o for s,p,o in self.rdf.graph.triples((None, self.rdf.prefixes.fedora.hasParent, None))]
-
-		# if as_resources, issue GET requests for children and return
-		if as_resources:
-			logger.debug('retrieving parent as resource')
-			parents = [ self.repo.get_resource(parent) for parent in parents ]
-
-		return parents
 
 
 
