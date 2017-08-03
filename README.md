@@ -218,3 +218,73 @@ for t in goober.triples(p=goober.rdf.prefixes.gn.countryCode):
 	print(t)
 (rdflib.term.URIRef('http://localhost:8080/rest/goober'), rdflib.term.URIRef('http://www.geonames.org/ontology#countryCode'), rdflib.term.Literal('FR'))
 ```
+
+#### Transactions
+
+pyfc4 also supports use of [transactions](https://wiki.duraspace.org/display/FEDORA40/Transactions) in FC4.  Transactions allow for work to be done on resources in the repository over a timeframe, then optionally committing or rolling back all the changes made during that time window.
+
+In FC4, transactions are essentially a prefix attached to all URIs that indicate these resources are part of, and being modified, within the scope of that transaction.  In pyfc4, transactions are implemented for Repository instances, modifying the `repo.root` value, ensuring all resources that use this repository instance will share that same prefix on the URIs.
+
+For example, a normal repository instance:
+```
+repo = Repository('http://localhost:8080/rest','username','password', context={'foo':'http://foo.com/ontology/','bar':'http://bar.org#'})
+In [3]: repo.root
+Out[3]: 'http://localhost:8080/rest/'
+```
+
+repository instances include a flag to indicate whether or not they are currently "in" a transaction:
+```
+In [4]: repo.in_txn
+Out[4]: False
+```
+
+To begin a transaction:
+```
+In [6]: repo.start_txn()
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest//fcr:tx, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 "POST /rest//fcr:tx HTTP/1.1" 201 0
+DEBUG:pyfc4.models:initiating transaction: http://localhost:8080/rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e
+Out[6]: True
+
+# indicating that currently in a transaction, and the new root URI that includes the transaction URI
+In [7]: repo.in_txn
+Out[7]: 'http://localhost:8080/rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e/'
+```
+
+Transactions will automatically expire after 3 minutes of inactivity, but they can be renewed/continued, with success returning a `204` code:
+```
+In [8]: repo.continue_txn()
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e//fcr:tx, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 "POST /rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e//fcr:tx HTTP/1.1" 204 0
+DEBUG:pyfc4.models:continuing transaction: http://localhost:8080/rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e/
+Out[8]: True
+```
+
+To commit the changes of a transaction, thereby committing all changes permananetly, and closing the transaction:
+```
+In [9]: repo.commit_txn()
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e//fcr:tx/fcr:commit, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 "POST /rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e//fcr:tx/fcr:commit HTTP/1.1" 204 0
+DEBUG:pyfc4.models:committing transaction: http://localhost:8080/rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e/
+Out[9]: True
+
+In [11]: repo.in_txn
+Out[11]: False
+```
+
+Alternatively, you can rollback the changes from a transaction, abandoning all changes to resources within the transaction, and like committing, close the transaction:
+```
+In [14]: repo.rollback_txn()
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest/tx:5055999e-8b0e-4e8f-8d4e-375264504aca//fcr:tx/fcr:rollback, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 "POST /rest/tx:5055999e-8b0e-4e8f-8d4e-375264504aca//fcr:tx/fcr:rollback HTTP/1.1" 204 0
+DEBUG:pyfc4.models:committing transaction: http://localhost:8080/rest/tx:5055999e-8b0e-4e8f-8d4e-375264504aca/
+Out[14]: True
+
+In [15]: repo.in_txn
+Out[15]: False
+```
+
