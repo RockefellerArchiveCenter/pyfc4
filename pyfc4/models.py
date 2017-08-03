@@ -78,7 +78,7 @@ class Repository(object):
 
 		# transaction
 		self.in_txn = False
-		
+
 		# if txn_uri is provided, attempt to retrieve and set transaction
 		if txn_uri:
 			self.get_txn(txn_uri)
@@ -200,9 +200,10 @@ class Repository(object):
 			self.root = txn_uri
 			# set in_txn flag 
 			self.in_txn = txn_uri
+			return True
 
 		# if 410, transaction does not exist
-		elif txn_response.status_code == 410:
+		elif txn_response.status_code == 404:
 			logger.debug("transaction does not exist: %s" % self.root)
 			return False
 
@@ -237,6 +238,7 @@ class Repository(object):
 				self.root = txn_uri 
 				# set in_txn flag 
 				self.in_txn = txn_uri
+				return True
 
 			else:
 				raise Exception('could not start transaction')
@@ -265,6 +267,7 @@ class Repository(object):
 			# if 204, transaction kept alive
 			if txn_response.status_code == 204:
 				logger.debug("continuing transaction: %s" % self.root)
+				return  True
 
 			# if 410, transaction does not exist
 			elif txn_response.status_code == 410:
@@ -287,7 +290,7 @@ class Repository(object):
 			None
 		
 		Return:
-			None
+			(bool)
 		'''
 
 		if self.in_txn:
@@ -301,6 +304,8 @@ class Repository(object):
 				self.root = self._root_persist
 				# set in_txn flag 
 				self.in_txn = False
+				# return
+				return True
 
 			# if 410, transaction does not exist
 			elif txn_response.status_code == 410:
@@ -337,6 +342,8 @@ class Repository(object):
 				self.root = self._root_persist
 				# set in_txn flag 
 				self.in_txn = False
+				# return 
+				return True
 
 			# if 410, transaction does not exist
 			elif txn_response.status_code == 410:

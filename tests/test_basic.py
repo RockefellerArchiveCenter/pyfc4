@@ -468,6 +468,36 @@ class TestIndirectContainer(object):
 		assert next(goober.rdf.graph.objects(None, goober.rdf.prefixes.foaf.based_near)) == foo.uri
 
 
+class TestTransaction(object):
+
+	def test_transactions_CRUD(self):
+
+		# create transaction from repo instance
+		assert repo.start_txn()
+		txn_uri = repo.root
+
+		# continue transaction
+		assert repo.continue_txn()
+
+		# retrieve known transaction
+		new_repo = Repository('http://localhost:8080/rest','admin','username')
+		assert new_repo.get_txn(txn_uri)
+
+		# attempt transaction that does not exist
+		new_repo2 = Repository('http://localhost:8080/rest','admin','username')
+		assert not new_repo2.get_txn('does_not_exist')
+
+		# commit txn
+		assert repo.commit_txn()
+
+		# roll back txn
+		repo.start_txn()
+		assert repo.rollback_txn()
+
+
+
+
+
 
 ########################################################
 # TEARDOWN
