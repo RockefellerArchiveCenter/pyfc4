@@ -56,14 +56,14 @@ class Repository(object):
 			username,
 			password,
 			context = None,
-			default_serialization = 'application/rdf+xml'
+			default_serialization = 'application/rdf+xml',
+			txn_uri = None
 		):
 
-		self._root_persist = root
 		self.root = root
-		self.in_txn = False
 		if not self.root.endswith('/'): # ensure trailing slash
 			self.root += '/'
+		self._root_persist = self.root
 		self.username = username
 		self.password = password
 		self.default_serialization = default_serialization
@@ -75,6 +75,13 @@ class Repository(object):
 		if context:
 			logger.debug('context provided, merging with defaults')
 			self.context.update(context)
+
+		# transaction
+		self.in_txn = False
+		
+		# if txn_uri is provided, attempt to retrieve and set transaction
+		if txn_uri:
+			self.get_txn(txn_uri)
 
 
 	def parse_uri(self, uri, use_non_txn_root=False):
