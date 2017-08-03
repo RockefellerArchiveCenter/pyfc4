@@ -24,6 +24,12 @@ Requires `pyfc4` installed as module, and without any configuration, an instance
 
 ## Basic Usage
 
+  * [establishing repository connection](#instantiate-repository-handle)
+  * creating resources
+    * [RDF](#create-rdf-resources)
+    * [NonRDF](#create-nonrdf-binary-resources)
+  * [retrieving resources](#get-resources)
+
 Assuming an instance of FC4 at `http://localhost:8080/rest`
 
 #### Instantiate repository handle
