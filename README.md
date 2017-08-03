@@ -29,6 +29,10 @@ Requires `pyfc4` installed as module, and without any configuration, an instance
     * [RDF](#create-rdf-resources)
     * [NonRDF](#create-nonrdf-binary-resources)
   * [retrieving resources](#get-resources)
+  * [resource relationships](#resource-relationships)
+    * [parents / children](#convenience-methods-for-children--parents)
+    * [reading / writing triples](#reading--writing-triples)
+  * [transactions](#transactions)
 
 Assuming an instance of FC4 at `http://localhost:8080/rest`
 
