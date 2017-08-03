@@ -35,7 +35,7 @@ Assuming an instance of FC4 at `http://localhost:8080/rest`
   * [resource relationships](#resource-relationships)
     * [parents / children](#convenience-methods-for-children--parents)
     * [reading / writing triples](#reading--writing-triples)
-    # [object-like access](#object-like-access)
+    * [object-like access](#object-like-access)
   * [transactions](#transactions)
 
 
