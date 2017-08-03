@@ -57,7 +57,7 @@ class Repository(object):
 			password,
 			context = None,
 			default_serialization = 'application/rdf+xml',
-			txn_uri = None
+			as_txn_uri = None
 		):
 
 		self.root = root
@@ -79,9 +79,9 @@ class Repository(object):
 		# transaction
 		self.in_txn = False
 
-		# if txn_uri is provided, attempt to retrieve and set transaction
-		if txn_uri:
-			self.get_txn(txn_uri)
+		# if as_txn_uri is provided, attempt to retrieve and set transaction
+		if as_txn_uri:
+			self.get_txn(as_txn_uri)
 
 
 	def parse_uri(self, uri, use_non_txn_root=False):

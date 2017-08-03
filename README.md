@@ -221,9 +221,9 @@ for t in goober.triples(p=goober.rdf.prefixes.gn.countryCode):
 
 #### Transactions
 
-pyfc4 also supports use of [transactions](https://wiki.duraspace.org/display/FEDORA40/Transactions) in FC4.  Transactions allow for work to be done on resources in the repository over a timeframe, then optionally committing or rolling back all the changes made during that time window.
+pyfc4 also supports use of [Transactions](https://wiki.duraspace.org/display/FEDORA40/Transactions) in FC4.  Transactions allow for work to be done on resources in the repository within a contained scope/session, with the ability to commit or roll back changes made within that session.
 
-In FC4, transactions are essentially a prefix attached to all URIs that indicate these resources are part of, and being modified, within the scope of that transaction.  In pyfc4, transactions are implemented for Repository instances, modifying the `repo.root` value, ensuring all resources that use this repository instance will share that same prefix on the URIs.
+Very roughly, in FC4, transactions are a prefix attached to all URIs that indicate these resources are part of, and being modified, within the scope of that transaction.  So where the base path may have been, `http://localhost:8080/rest`, for a scoped transaction, the base path might become, `http://localhost:8080/rest/txn:123456789/`.  In pyfc4, transactions are implemented for Repository instances, modifying the `repo.root` value, ensuring all resources that use this repository instance will share that same prefix on the URIs.
 
 For example, a normal repository instance:
 ```
@@ -232,7 +232,7 @@ In [3]: repo.root
 Out[3]: 'http://localhost:8080/rest/'
 ```
 
-repository instances include a flag to indicate whether or not they are currently "in" a transaction:
+Repository instances include a flag to indicate whether or not they are currently "in" a transaction:
 ```
 In [4]: repo.in_txn
 Out[4]: False
@@ -250,6 +250,32 @@ Out[6]: True
 # indicating that currently in a transaction, and the new root URI that includes the transaction URI
 In [7]: repo.in_txn
 Out[7]: 'http://localhost:8080/rest/tx:d6301306-8d7a-4f3b-9fb9-cf0cdd56da4e/'
+```
+
+One can see that this transaction is shared with any resources retrieved using that repository instance, as `self.repo` is a pointer back to this original repository instance.
+```
+In [4]: repo.start_txn()
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest//fcr:tx, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 "POST /rest//fcr:tx HTTP/1.1" 201 0
+DEBUG:pyfc4.models:initiating transaction: http://localhost:8080/rest/tx:718d979e-117a-4edb-abb4-290e2bd7f8a7
+Out[4]: True
+
+In [5]: foo = repo.get_resource('foo')
+DEBUG:pyfc4.models:HEAD request for http://localhost:8080/rest/tx:718d979e-117a-4edb-abb4-290e2bd7f8a7/foo, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 "HEAD /rest/tx:718d979e-117a-4edb-abb4-290e2bd7f8a7/foo HTTP/1.1" 200 0
+DEBUG:pyfc4.models:parsed Link headers: ['<http://www.w3.org/ns/ldp#Resource>', '<http://www.w3.org/ns/ldp#Container>', '<http://www.w3.org/ns/ldp#BasicContainer>']
+DEBUG:pyfc4.models:using resource type: <class 'pyfc4.models.BasicContainer'>
+DEBUG:pyfc4.models:GET request for http://localhost:8080/rest/tx:718d979e-117a-4edb-abb4-290e2bd7f8a7/foo/fcr:metadata, format application/rdf+xml, headers {'Accept': 'application/rdf+xml'}
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 "GET /rest/tx:718d979e-117a-4edb-abb4-290e2bd7f8a7/foo/fcr:metadata HTTP/1.1" 200 2664
+
+In [6]: foo.repo.root
+Out[6]: 'http://localhost:8080/rest/tx:718d979e-117a-4edb-abb4-290e2bd7f8a7/'
+
+In [7]: foo.repo.in_txn
+Out[7]: 'http://localhost:8080/rest/tx:718d979e-117a-4edb-abb4-290e2bd7f8a7/'
 ```
 
 Transactions will automatically expire after 3 minutes of inactivity, but they can be renewed/continued, with success returning a `204` code:
@@ -287,4 +313,30 @@ Out[14]: True
 In [15]: repo.in_txn
 Out[15]: False
 ```
+
+##### An example
+
+One pattern might be the creation of a complex intellectual item, that results in the creation of a handful of resources.  One approach might be to create a new repository instance, create these related resources, commit that transaction, and then discard it.
+
+```
+batch_repo = Repository('http://localhost:8080/rest','username','password')
+batch_repo.start_txn()
+
+# create resources with the batch_repo
+foo = BasicContainer(batch_repo,'foo')
+foo.create(specify_uri=True)
+
+bar = BasicContainer(batch_repo,'foo/bar')
+bar.create(specify_uri=True)
+
+# more work ...
+
+# commit changes
+batch_repo.commit_txn()
+
+# optionally, discard that repository instance
+del batch_repo
+```
+
+
 
