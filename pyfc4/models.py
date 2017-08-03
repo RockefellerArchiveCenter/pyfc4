@@ -114,16 +114,23 @@ class Repository(object):
 			return uri
 
 
-	def create_resource(self, uri, resource_type):
+	def create_resource(self, uri=None, resource_type=None):
 
 		'''
 		Convenience method for creating a new resource
 
 		Args:
+			uri (rdflib.term.URIRef, str): uri of resource to create
+			resource_type (NonRDFSource (Binary), BasicContainer, DirectContainer, IndirectContainer):  resource type to create
 
 		Returns:
+			(NonRDFSource (Binary), BasicContainer, DirectContainer, IndirectContainer): instance of appropriate type
 		'''
-		pass
+
+		if resource_type:
+			return resource_type(self, uri)
+		else:
+			raise Exception("please provide class of resource type")
 
 
 	def get_resource(self, uri, response_format=None):
