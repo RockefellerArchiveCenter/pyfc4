@@ -9,6 +9,7 @@ from rdflib.compare import to_isomorphic, graph_diff
 import rdflib_jsonld
 import requests
 from types import SimpleNamespace
+import uuid
 
 # logging
 import logging
@@ -57,15 +58,16 @@ class Repository(object):
 			password,
 			context = None,
 			default_serialization = 'application/rdf+xml',
-			as_txn_uri = None
 		):
 
+		# handle root path
 		self.root = root
 		if not self.root.endswith('/'): # ensure trailing slash
 			self.root += '/'
-		self._root_persist = self.root
 		self.username = username
 		self.password = password
+
+		# serialization
 		self.default_serialization = default_serialization
 
 		# API facade
@@ -76,15 +78,11 @@ class Repository(object):
 			logger.debug('context provided, merging with defaults')
 			self.context.update(context)
 
-		# transaction
-		self.in_txn = False
-
-		# if as_txn_uri is provided, attempt to retrieve and set transaction
-		if as_txn_uri:
-			self.get_txn(as_txn_uri)
+		# container for transactions
+		self.txns = {}
 
 
-	def parse_uri(self, uri, use_non_txn_root=False):
+	def parse_uri(self, uri):
 	
 		'''
 		parses and cleans up possible uri inputs, return instance of rdflib.term.URIRef
@@ -96,22 +94,16 @@ class Repository(object):
 			rdflib.term.URIRef
 		'''
 
-		# if use_non_txn_root, use original persisted root
-		if use_non_txn_root:
-			root = self._root_persist
-		else:
-			root = self.root
-
 		# no uri provided, assume root
 		if not uri:
-			return rdflib.term.URIRef(root)
+			return rdflib.term.URIRef(self.root)
 
 		# string uri provided
 		elif type(uri) == str:
 
 			# assume "short" uri, expand with repo root
 			if type(uri) == str and not uri.startswith('http'):
-				return rdflib.term.URIRef("%s%s" % (root, uri))
+				return rdflib.term.URIRef("%s%s" % (self.root, uri))
 
 			# else, assume full uri
 			else:
@@ -120,6 +112,18 @@ class Repository(object):
 		# already cleaned and URIRef type
 		else:
 			return uri
+
+
+	def create_resource(self, uri, resource_type):
+
+		'''
+		Convenience method for creating a new resource
+
+		Args:
+
+		Returns:
+		'''
+		pass
 
 
 	def get_resource(self, uri, response_format=None):
@@ -172,189 +176,244 @@ class Repository(object):
 			raise Exception('error retrieving resource uri %s' % uri)
 
 
-	def get_txn(self, txn_uri):
+	def start_txn(self, txn_name=None):
 
 		'''
-		Retrieve transaction, parse txn prefix from headers,
-		and set self.root as txn URI.
+		Request new transaction from repository, init new Transaction, 
+		store in self.txns
+
+		Args:
+			txn_name (str): human name for transaction
+		
+		Return:
+			(Transaction): returns intance of newly created transaction
+		'''
+
+		# if no name provided, create one
+		if not txn_name:
+			txn_name = uuid.uuid4().hex
+
+		# request new transaction
+		txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
+
+		# if 201, transaction was created
+		if txn_response.status_code == 201:
+
+			txn_uri = txn_response.headers['Location']
+			logger.debug("spawning transaction: %s" % txn_uri)
+			
+			# init new Transaction, and pass Expires header
+			txn = Transaction(
+				self, # pass the repository
+				txn_name,
+				txn_uri,
+				expires = txn_response.headers['Expires'])
+				
+			# append to self
+			self.txns[txn_name] = txn
+
+			# return 
+			return txn
+
+
+	def get_txn(self, txn_uri, txn_name):
+
+		'''
+		Retrieves known transaction and adds to self.txns.
+
+		TODO:
+			Perhaps this should send a keep-alive request as well?  Obviously still needed, and would reset timer.
 
 		Args:
 			txn_prefix (str, rdflib.term.URIRef): uri of the transaction. e.g. http://localhost:8080/rest/txn:123456789
+			txn_name (str): local, human name for transaction
 		
 		Return:
-			None
+			(Transaction) local instance of transactions from self.txns[txn_uri]
 		'''
 
 		# parse uri
-		txn_uri = self.parse_uri(txn_uri, use_non_txn_root=True)
+		txn_uri = self.parse_uri(txn_uri)
 
 		# request new transaction
 		txn_response = self.api.http_request('GET',txn_uri, data=None, headers=None)
 
-		# if 201, transaction was created
+		# if 200, transaction exists
 		if txn_response.status_code == 200:
 			logger.debug("transactoin found: %s" % txn_uri)
-			# set self.root with txn prefix
-			if not txn_uri.endswith('/'): # ensure trailing slash
-				txn_uri += '/'
-			self.root = txn_uri
-			# set in_txn flag 
-			self.in_txn = txn_uri
-			return True
+
+			# init new Transaction, and pass Expires header
+			txn = Transaction(
+				self, # pass the repository
+				txn_name,
+				txn_uri,
+				expires = None)
+				
+			# append to self
+			self.txns[txn_name] = txn
+
+			# return 
+			return txn
+
+		# if 404, transaction does not exist
+		elif txn_response.status_code == 404:
+			logger.debug("transaction does not exist: %s" % txn_uri)
+			return False
+
+		else:
+			raise Exception('could not retrieve transaction')
+
+
+
+class Transaction(Repository):
+
+	'''
+	Class to represent open transactions.  Spawned by repository instance, these are stored in
+	repo.txns.
+
+	Inherits:
+		Repository
+
+	Args:
+		txn_name (str): provided at init
+	'''
+
+	def __init__(self, 
+			repo,
+			txn_name,
+			txn_uri,
+			expires = None
+		):
+
+		# fire parent Repository init()
+		super().__init__(
+			txn_uri,
+			repo.username,
+			repo.password,
+			context = repo.context,
+			default_serialization = repo.default_serialization)
+
+		# Transaction init
+		self.name = txn_name
+		self.expires = expires
+
+		# txn status
+		self.exists = True
+
+
+	def check_exists(self):
+
+		'''
+		Method to confirm that transaction exists, update as necessary
+		'''
+		pass
+
+
+	def keep_alive(self):
+
+		'''
+		Keep current transaction alive.
+
+		Args:
+			None
+
+		Return:
+			None: sets new self.expires
+		'''
+
+		# keep transaction alive
+		txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
+
+		# if 204, transaction kept alive
+		if txn_response.status_code == 204:
+			logger.debug("continuing transaction: %s" % self.root)
+			# update timer
+			self.expires = txn_response.headers['Expires']
+			return  True
 
 		# if 410, transaction does not exist
-		elif txn_response.status_code == 404:
+		elif txn_response.status_code == 410:
 			logger.debug("transaction does not exist: %s" % self.root)
 			return False
 
 		else:
-			raise Exception('could not start transaction')
+			raise Exception('could not continue transaction')
 
 
-	def start_txn(self):
+	# def commit(self):
 
-		'''
-		Request new transaction, parse txn prefix from headers,
-		and set self.root as txn URI.
+	# 	'''
+	# 	Commit transaction, all changes saved, return self.root to originally instantiated root
 
-		Args:
-			None
+	# 	Args:
+	# 		None
 		
-		Return:
-			None
-		'''
+	# 	Return:
+	# 		(bool)
+	# 	'''
 
-		if not self.in_txn:
-			# request new transaction
-			txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
+	# 	if self.in_txn:
+	# 		# commit transaction
+	# 		txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:commit' % self.root, data=None, headers=None)
 
-			# if 201, transaction was created
-			if txn_response.status_code == 201:
-				txn_uri = txn_response.headers['Location']
-				logger.debug("initiating transaction: %s" % txn_uri)
-				# set self.root with txn prefix
-				if not txn_uri.endswith('/'): # ensure trailing slash
-					txn_uri += '/'
-				self.root = txn_uri 
-				# set in_txn flag 
-				self.in_txn = txn_uri
-				return True
+	# 		# if 204, transaction was committed
+	# 		if txn_response.status_code == 204:
+	# 			logger.debug("committing transaction: %s" % self.root)
+	# 			# set self.root with txn prefix
+	# 			self.root = self._root_persist
+	# 			# set in_txn flag 
+	# 			self.in_txn = False
+	# 			# return
+	# 			return True
 
-			else:
-				raise Exception('could not start transaction')
+	# 		# if 410, transaction does not exist
+	# 		elif txn_response.status_code == 410:
+	# 			logger.debug("transaction does not exist: %s" % self.root)
+	# 			return False
 
-		else:
-			raise Exception('repository instance currently in transcation: %s' % self.in_txn)
+	# 		else:
+	# 			raise Exception('could not commit transaction')
 
-
-	def continue_txn(self):
-
-		'''
-		Keep current transaction alive
-
-		Args:
-			None
-
-		Return:
-			None
-		'''
-
-		if self.in_txn:
-
-			# keep transaction alive
-			txn_response = self.api.http_request('POST','%s/fcr:tx' % self.root, data=None, headers=None)
-
-			# if 204, transaction kept alive
-			if txn_response.status_code == 204:
-				logger.debug("continuing transaction: %s" % self.root)
-				return  True
-
-			# if 410, transaction does not exist
-			elif txn_response.status_code == 410:
-				logger.debug("transaction does not exist: %s" % self.root)
-				return False
-
-			else:
-				raise Exception('could not continue transaction')
-
-		else:
-			raise Exception('repository instance not currently in a transcation')
+	# 	else:
+	# 		raise Exception('repository instance not currently in a transcation')
 
 
-	def commit_txn(self):
+	# def rollback(self):
 
-		'''
-		Commit transaction, all changes saved, return self.root to originally instantiated root
+	# 	'''
+	# 	Rollback transaction, no changes are made, return self.root to originally instantiated root
 
-		Args:
-			None
+	# 	Args:
+	# 		None
 		
-		Return:
-			(bool)
-		'''
+	# 	Return:
+	# 		None
+	# 	'''
 
-		if self.in_txn:
-			# commit transaction
-			txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:commit' % self.root, data=None, headers=None)
+	# 	if self.in_txn:
+	# 		# rollback transaction
+	# 		txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:rollback' % self.root, data=None, headers=None)
 
-			# if 204, transaction was committed
-			if txn_response.status_code == 204:
-				logger.debug("committing transaction: %s" % self.root)
-				# set self.root with txn prefix
-				self.root = self._root_persist
-				# set in_txn flag 
-				self.in_txn = False
-				# return
-				return True
+	# 		# if 204, transaction was committed
+	# 		if txn_response.status_code == 204:
+	# 			logger.debug("committing transaction: %s" % self.root)
+	# 			# set self.root with txn prefix
+	# 			self.root = self._root_persist
+	# 			# set in_txn flag 
+	# 			self.in_txn = False
+	# 			# return 
+	# 			return True
 
-			# if 410, transaction does not exist
-			elif txn_response.status_code == 410:
-				logger.debug("transaction does not exist: %s" % self.root)
-				return False
+	# 		# if 410, transaction does not exist
+	# 		elif txn_response.status_code == 410:
+	# 			logger.debug("transaction does not exist: %s" % self.root)
+	# 			return False
 
-			else:
-				raise Exception('could not commit transaction')
+	# 		else:
+	# 			raise Exception('could not commit transaction')
 
-		else:
-			raise Exception('repository instance not currently in a transcation')
-
-
-	def rollback_txn(self):
-
-		'''
-		Rollback transaction, no changes are made, return self.root to originally instantiated root
-
-		Args:
-			None
-		
-		Return:
-			None
-		'''
-
-		if self.in_txn:
-			# rollback transaction
-			txn_response = self.api.http_request('POST','%s/fcr:tx/fcr:rollback' % self.root, data=None, headers=None)
-
-			# if 204, transaction was committed
-			if txn_response.status_code == 204:
-				logger.debug("committing transaction: %s" % self.root)
-				# set self.root with txn prefix
-				self.root = self._root_persist
-				# set in_txn flag 
-				self.in_txn = False
-				# return 
-				return True
-
-			# if 410, transaction does not exist
-			elif txn_response.status_code == 410:
-				logger.debug("transaction does not exist: %s" % self.root)
-				return False
-
-			else:
-				raise Exception('could not commit transaction')
-
-		else:
-			raise Exception('repository instance not currently in a transcation')
+	# 	else:
+	# 		raise Exception('repository instance not currently in a transcation')
 
 
 
