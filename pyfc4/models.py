@@ -723,7 +723,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False):
 
 		'''
 		Primary method to create resources.
@@ -763,7 +763,7 @@ class Resource(object):
 				self.headers['Content-Type'] = serialization_format
 			
 			# fire creation request
-			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
+			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers, stream=stream)
 			return self._handle_create(response, ignore_tombstone)
 			
 
@@ -1095,25 +1095,7 @@ class Resource(object):
 		self.rdf.namespace_manager.bind(ns_prefix, ns_uri, override=False)
 
 
-	def _build_binary(self):
-
-		'''
-		builds binary attributes for resource
-
-		Args:
-			None
-
-		Return:
-			None: sets various attributes
-		'''
-
-		# binary data
-		self.binary = SimpleNamespace()
-		self.binary.delivery = None
-		self.binary.data = None
-		self.binary.stream = False
-		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
-		self.binary.location = None
+	
 
 
 	def _empty_resource_attributes(self):
@@ -1515,6 +1497,9 @@ class NonRDFSource(Resource):
 	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
 	https://www.w3.org/TR/ldp/
 
+	Note: When a pre-existing NonRDFSource is retrieved, the binary data is stored under self.binary.data as a
+	streamable requests object.
+
 	Inherits:
 		Resource
 
@@ -1534,27 +1519,55 @@ class NonRDFSource(Resource):
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 		# binary data
+		self._build_binary()
+		
+		# like RDF, if exists, retrieve binary data
+		if self.exists:
+			self.parse_binary()
+			
+
+	def parse_binary(self):
+
+		'''
+		when retrieving a NonRDF resource, parse binary data and make available
+		via generators
+		'''
+
+		# derive mimetype
+		self.binary.mimetype = self.rdf.graph.value(
+			self.uri,
+			self.rdf.prefixes.ebucore.hasMimeType).toPython()
+		
+		# get binary content as stremable response
+		self.binary.data = self.repo.api.http_request(
+			'GET',
+			self.uri,
+			data=None,
+			headers={'Content-Type':self.binary.mimetype},
+			is_rdf=False,
+			stream=True)
+
+
+
+	def _build_binary(self):
+
+		'''
+		builds binary attributes for resource
+
+		Args:
+			None
+
+		Return:
+			None: sets various attributes
+		'''
+
+		# binary data
 		self.binary = SimpleNamespace()
 		self.binary.delivery = None
 		self.binary.data = None
 		self.binary.stream = False
 		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
 		self.binary.location = None
-		
-		# like RDF, if exists, retrieve binary data
-		if self.exists:
-
-			# get mimetype
-			self.binary.mimetype = self.rdf.graph.value(
-				self.uri,
-				self.rdf.prefixes.ebucore.hasMimeType).toPython()
-			self.binary.data = self.repo.api.http_request(
-				'GET',
-				self.uri,
-				data=None,
-				headers={'Content-Type':self.binary.mimetype},
-				is_rdf=False,
-				stream=True).content
 
 
 	def _prep_binary_data(self):

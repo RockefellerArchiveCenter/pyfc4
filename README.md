@@ -145,6 +145,27 @@ In [5]: i_do_not_exist
 Out[5]: False
 ```
 
+Retrieving NonRDFSources is similar to RDFSources, with the addition of a `self.binary` section.  The `self.binary.mimetype` is retrieved from the resource's graph, while the binary data itself is made ready for access, *but not downloaded*, at `self.binary.data` as a `requests.models.Response` instance.  
+
+The easiest and most performant way to use this data is to use a requests object's built-in [`iter_content`](http://docs.python-requests.org/en/master/api/#requests.Response.iter_content) method.
+
+For example:
+```
+# retrieve binary resource
+baz = repo.get_resource('foo/baz')
+
+# observe binary.data
+In [8]: type(baz.binary.data)
+Out[8]: requests.models.Response
+
+# access binary data in one swoop
+baz.binary.data.content
+
+# chunk data for large files
+for chunk in baz.binary.data.iter_content(1024): using 1024 byte chunk size
+  # do things with chunk
+```
+
 #### Resource relationships
 
 ##### Convenience methods for children / parents

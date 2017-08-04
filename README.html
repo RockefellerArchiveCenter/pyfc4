@@ -1,0 +1,1328 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>body {
+  max-width: 980px;
+  border: 1px solid #ddd;
+  outline: 1300px solid #fff;
+  margin: 16px auto;
+}
+
+body .markdown-body
+{
+  padding: 45px;
+}
+
+@font-face {
+  font-family: fontawesome-mini;
+  src: url(data:font/woff;charset=utf-8;base64,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) format('woff');
+}
+
+@font-face {
+  font-family: octicons-anchor;
+  src: url(data:font/woff;charset=utf-8;base64,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) format('woff');
+}
+
+.markdown-body {
+  font-family: sans-serif;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  color: #333333;
+  overflow: hidden;
+  font-family: "Helvetica Neue", Helvetica, "Segoe UI", Arial, freesans, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+.markdown-body a {
+  background: transparent;
+}
+
+.markdown-body a:active,
+.markdown-body a:hover {
+  outline: 0;
+}
+
+.markdown-body b,
+.markdown-body strong {
+  font-weight: bold;
+}
+
+.markdown-body mark {
+  background: #ff0;
+  color: #000;
+  font-style: italic;
+  font-weight: bold;
+}
+
+.markdown-body sub,
+.markdown-body sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+.markdown-body sup {
+  top: -0.5em;
+}
+.markdown-body sub {
+  bottom: -0.25em;
+}
+
+.markdown-body h1 {
+  font-size: 2em;
+  margin: 0.67em 0;
+}
+
+.markdown-body img {
+  border: 0;
+}
+
+.markdown-body hr {
+  -moz-box-sizing: content-box;
+  box-sizing: content-box;
+  height: 0;
+}
+
+.markdown-body pre {
+  overflow: auto;
+}
+
+.markdown-body code,
+.markdown-body kbd,
+.markdown-body pre,
+.markdown-body samp {
+  font-family: monospace, monospace;
+  font-size: 1em;
+}
+
+.markdown-body input {
+  color: inherit;
+  font: inherit;
+  margin: 0;
+}
+
+.markdown-body html input[disabled] {
+  cursor: default;
+}
+
+.markdown-body input {
+  line-height: normal;
+}
+
+.markdown-body input[type="checkbox"] {
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.markdown-body table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.markdown-body td,
+.markdown-body th {
+  padding: 0;
+}
+
+.markdown-body .codehilitetable {
+  border: 0;
+  border-spacing: 0;
+}
+
+.markdown-body .codehilitetable tr {
+  border: 0;
+}
+
+.markdown-body .codehilitetable pre,
+.markdown-body .codehilitetable div.codehilite {
+  margin: 0;
+}
+
+.markdown-body .linenos,
+.markdown-body .code,
+.markdown-body .codehilitetable td {
+  border: 0;
+  padding: 0;
+}
+
+.markdown-body td:not(.linenos) .linenodiv {
+  padding: 0 !important;
+}
+
+.markdown-body .code {
+  width: 100%;
+}
+
+.markdown-body .linenos div pre,
+.markdown-body .linenodiv pre,
+.markdown-body .linenodiv {
+  border: 0;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  -webkit-border-top-left-radius: 3px;
+  -webkit-border-bottom-left-radius: 3px;
+  -moz-border-radius-topleft: 3px;
+  -moz-border-radius-bottomleft: 3px;
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+
+.markdown-body .code div pre,
+.markdown-body .code div {
+  border: 0;
+  -webkit-border-radius: 0;
+  -moz-border-radius: 0;
+  border-radius: 0;
+  -webkit-border-top-right-radius: 3px;
+  -webkit-border-bottom-right-radius: 3px;
+  -moz-border-radius-topright: 3px;
+  -moz-border-radius-bottomright: 3px;
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+
+.markdown-body * {
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.markdown-body input {
+  font: 13px Helvetica, arial, freesans, clean, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  line-height: 1.4;
+}
+
+.markdown-body a {
+  color: #4183c4;
+  text-decoration: none;
+}
+
+.markdown-body a:hover,
+.markdown-body a:focus,
+.markdown-body a:active {
+  text-decoration: underline;
+}
+
+.markdown-body hr {
+  height: 0;
+  margin: 15px 0;
+  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.markdown-body hr:before,
+.markdown-body hr:after {
+  display: table;
+  content: " ";
+}
+
+.markdown-body hr:after {
+  clear: both;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin-top: 15px;
+  margin-bottom: 15px;
+  line-height: 1.1;
+}
+
+.markdown-body h1 {
+  font-size: 30px;
+}
+
+.markdown-body h2 {
+  font-size: 21px;
+}
+
+.markdown-body h3 {
+  font-size: 16px;
+}
+
+.markdown-body h4 {
+  font-size: 14px;
+}
+
+.markdown-body h5 {
+  font-size: 12px;
+}
+
+.markdown-body h6 {
+  font-size: 11px;
+}
+
+.markdown-body blockquote {
+  margin: 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.markdown-body ol ol,
+.markdown-body ul ol {
+  list-style-type: lower-roman;
+}
+
+.markdown-body ul ul ol,
+.markdown-body ul ol ol,
+.markdown-body ol ul ol,
+.markdown-body ol ol ol {
+  list-style-type: lower-alpha;
+}
+
+.markdown-body dd {
+  margin-left: 0;
+}
+
+.markdown-body code,
+.markdown-body pre,
+.markdown-body samp {
+  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 12px;
+}
+
+.markdown-body pre {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.markdown-body kbd {
+  background-color: #e7e7e7;
+  background-image: -moz-linear-gradient(#fefefe, #e7e7e7);
+  background-image: -webkit-linear-gradient(#fefefe, #e7e7e7);
+  background-image: linear-gradient(#fefefe, #e7e7e7);
+  background-repeat: repeat-x;
+  border-radius: 2px;
+  border: 1px solid #cfcfcf;
+  color: #000;
+  padding: 3px 5px;
+  line-height: 10px;
+  font: 11px Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  display: inline-block;
+}
+
+.markdown-body>*:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body>*:last-child {
+  margin-bottom: 0 !important;
+}
+
+.markdown-body .headeranchor-link {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: block;
+  padding-right: 6px;
+  padding-left: 30px;
+  margin-left: -30px;
+}
+
+.markdown-body .headeranchor-link:focus {
+  outline: none;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  position: relative;
+  margin-top: 1em;
+  margin-bottom: 16px;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.markdown-body h1 .headeranchor,
+.markdown-body h2 .headeranchor,
+.markdown-body h3 .headeranchor,
+.markdown-body h4 .headeranchor,
+.markdown-body h5 .headeranchor,
+.markdown-body h6 .headeranchor {
+  display: none;
+  color: #000;
+  vertical-align: middle;
+}
+
+.markdown-body h1:hover .headeranchor-link,
+.markdown-body h2:hover .headeranchor-link,
+.markdown-body h3:hover .headeranchor-link,
+.markdown-body h4:hover .headeranchor-link,
+.markdown-body h5:hover .headeranchor-link,
+.markdown-body h6:hover .headeranchor-link {
+  height: 1em;
+  padding-left: 8px;
+  margin-left: -30px;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.markdown-body h1:hover .headeranchor-link .headeranchor,
+.markdown-body h2:hover .headeranchor-link .headeranchor,
+.markdown-body h3:hover .headeranchor-link .headeranchor,
+.markdown-body h4:hover .headeranchor-link .headeranchor,
+.markdown-body h5:hover .headeranchor-link .headeranchor,
+.markdown-body h6:hover .headeranchor-link .headeranchor {
+  display: inline-block;
+}
+
+.markdown-body h1 {
+  padding-bottom: 0.3em;
+  font-size: 2.25em;
+  line-height: 1.2;
+  border-bottom: 1px solid #eee;
+}
+
+.markdown-body h2 {
+  padding-bottom: 0.3em;
+  font-size: 1.75em;
+  line-height: 1.225;
+  border-bottom: 1px solid #eee;
+}
+
+.markdown-body h3 {
+  font-size: 1.5em;
+  line-height: 1.43;
+}
+
+.markdown-body h4 {
+  font-size: 1.25em;
+}
+
+.markdown-body h5 {
+  font-size: 1em;
+}
+
+.markdown-body h6 {
+  font-size: 1em;
+  color: #777;
+}
+
+.markdown-body p,
+.markdown-body blockquote,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body dl,
+.markdown-body table,
+.markdown-body pre,
+.markdown-body .admonition {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.markdown-body hr {
+  height: 4px;
+  padding: 0;
+  margin: 16px 0;
+  background-color: #e7e7e7;
+  border: 0 none;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  padding-left: 2em;
+}
+
+.markdown-body ul ul,
+.markdown-body ul ol,
+.markdown-body ol ol,
+.markdown-body ol ul {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.markdown-body li>p {
+  margin-top: 16px;
+}
+
+.markdown-body dl {
+  padding: 0;
+}
+
+.markdown-body dl dt {
+  padding: 0;
+  margin-top: 16px;
+  font-size: 1em;
+  font-style: italic;
+  font-weight: bold;
+}
+
+.markdown-body dl dd {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.markdown-body blockquote {
+  padding: 0 15px;
+  color: #777;
+  border-left: 4px solid #ddd;
+}
+
+.markdown-body blockquote>:first-child {
+  margin-top: 0;
+}
+
+.markdown-body blockquote>:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body table {
+  display: block;
+  width: 100%;
+  overflow: auto;
+  word-break: normal;
+  word-break: keep-all;
+}
+
+.markdown-body table th {
+  font-weight: bold;
+}
+
+.markdown-body table th,
+.markdown-body table td {
+  padding: 6px 13px;
+  border: 1px solid #ddd;
+}
+
+.markdown-body table tr {
+  background-color: #fff;
+  border-top: 1px solid #ccc;
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background-color: #f8f8f8;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+.markdown-body code,
+.markdown-body samp {
+  padding: 0;
+  padding-top: 0.2em;
+  padding-bottom: 0.2em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(0,0,0,0.04);
+  border-radius: 3px;
+}
+
+.markdown-body code:before,
+.markdown-body code:after {
+  letter-spacing: -0.2em;
+  content: "\00a0";
+}
+
+.markdown-body pre>code {
+  padding: 0;
+  margin: 0;
+  font-size: 100%;
+  word-break: normal;
+  white-space: pre;
+  background: transparent;
+  border: 0;
+}
+
+.markdown-body .codehilite {
+  margin-bottom: 16px;
+}
+
+.markdown-body .codehilite pre,
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f7f7f7;
+  border-radius: 3px;
+}
+
+.markdown-body .codehilite pre {
+  margin-bottom: 0;
+  word-break: normal;
+}
+
+.markdown-body pre {
+  word-wrap: normal;
+}
+
+.markdown-body pre code {
+  display: inline;
+  max-width: initial;
+  padding: 0;
+  margin: 0;
+  overflow: initial;
+  line-height: inherit;
+  word-wrap: normal;
+  background-color: transparent;
+  border: 0;
+}
+
+.markdown-body pre code:before,
+.markdown-body pre code:after {
+  content: normal;
+}
+
+/* Admonition */
+.markdown-body .admonition {
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  position: relative;
+  border-radius: 3px;
+  border: 1px solid #e0e0e0;
+  border-left: 6px solid #333;
+  padding: 10px 10px 10px 30px;
+}
+
+.markdown-body .admonition table {
+  color: #333;
+}
+
+.markdown-body .admonition p {
+  padding: 0;
+}
+
+.markdown-body .admonition-title {
+  font-weight: bold;
+  margin: 0;
+}
+
+.markdown-body .admonition>.admonition-title {
+  color: #333;
+}
+
+.markdown-body .attention>.admonition-title {
+  color: #a6d796;
+}
+
+.markdown-body .caution>.admonition-title {
+  color: #d7a796;
+}
+
+.markdown-body .hint>.admonition-title {
+  color: #96c6d7;
+}
+
+.markdown-body .danger>.admonition-title {
+  color: #c25f77;
+}
+
+.markdown-body .question>.admonition-title {
+  color: #96a6d7;
+}
+
+.markdown-body .note>.admonition-title {
+  color: #d7c896;
+}
+
+.markdown-body .admonition:before,
+.markdown-body .attention:before,
+.markdown-body .caution:before,
+.markdown-body .hint:before,
+.markdown-body .danger:before,
+.markdown-body .question:before,
+.markdown-body .note:before {
+  font: normal normal 16px fontawesome-mini;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  line-height: 1.5;
+  color: #333;
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding-top: 10px;
+  padding-left: 10px;
+}
+
+.markdown-body .admonition:before {
+  content: "\f056\00a0";
+  color: 333;
+}
+
+.markdown-body .attention:before {
+  content: "\f058\00a0";
+  color: #a6d796;
+}
+
+.markdown-body .caution:before {
+  content: "\f06a\00a0";
+  color: #d7a796;
+}
+
+.markdown-body .hint:before {
+  content: "\f05a\00a0";
+  color: #96c6d7;
+}
+
+.markdown-body .danger:before {
+  content: "\f057\00a0";
+  color: #c25f77;
+}
+
+.markdown-body .question:before {
+  content: "\f059\00a0";
+  color: #96a6d7;
+}
+
+.markdown-body .note:before {
+  content: "\f040\00a0";
+  color: #d7c896;
+}
+
+.markdown-body .admonition::after {
+  content: normal;
+}
+
+.markdown-body .attention {
+  border-left: 6px solid #a6d796;
+}
+
+.markdown-body .caution {
+  border-left: 6px solid #d7a796;
+}
+
+.markdown-body .hint {
+  border-left: 6px solid #96c6d7;
+}
+
+.markdown-body .danger {
+  border-left: 6px solid #c25f77;
+}
+
+.markdown-body .question {
+  border-left: 6px solid #96a6d7;
+}
+
+.markdown-body .note {
+  border-left: 6px solid #d7c896;
+}
+
+.markdown-body .admonition>*:first-child {
+  margin-top: 0 !important;
+}
+
+.markdown-body .admonition>*:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* progress bar*/
+.markdown-body .progress {
+  display: block;
+  width: 300px;
+  margin: 10px 0;
+  height: 24px;
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  border-radius: 3px;
+  background-color: #ededed;
+  position: relative;
+  box-shadow: inset -1px 1px 3px rgba(0, 0, 0, .1);
+}
+
+.markdown-body .progress-label {
+  position: absolute;
+  text-align: center;
+  font-weight: bold;
+  width: 100%; margin: 0;
+  line-height: 24px;
+  color: #333;
+  text-shadow: 1px 1px 0 #fefefe, -1px -1px 0 #fefefe, -1px 1px 0 #fefefe, 1px -1px 0 #fefefe, 0 1px 0 #fefefe, 0 -1px 0 #fefefe, 1px 0 0 #fefefe, -1px 0 0 #fefefe, 1px 1px 2px #000;
+  -webkit-font-smoothing: antialiased !important;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.markdown-body .progress-bar {
+  height: 24px;
+  float: left;
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  border-radius: 3px;
+  background-color: #96c6d7;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), inset 0 -1px 0 rgba(0, 0, 0, .1);
+  background-size: 30px 30px;
+  background-image: -webkit-linear-gradient(
+    135deg, rgba(255, 255, 255, .4) 27%,
+    transparent 27%,
+    transparent 52%, rgba(255, 255, 255, .4) 52%,
+    rgba(255, 255, 255, .4) 77%,
+    transparent 77%, transparent
+  );
+  background-image: -moz-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, .4) 27%, transparent 27%,
+    transparent 52%, rgba(255, 255, 255, .4) 52%,
+    rgba(255, 255, 255, .4) 77%, transparent 77%,
+    transparent
+  );
+  background-image: -ms-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, .4) 27%, transparent 27%,
+    transparent 52%, rgba(255, 255, 255, .4) 52%,
+    rgba(255, 255, 255, .4) 77%, transparent 77%,
+    transparent
+  );
+  background-image: -o-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, .4) 27%, transparent 27%,
+    transparent 52%, rgba(255, 255, 255, .4) 52%,
+    rgba(255, 255, 255, .4) 77%, transparent 77%,
+    transparent
+  );
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, .4) 27%, transparent 27%,
+    transparent 52%, rgba(255, 255, 255, .4) 52%,
+    rgba(255, 255, 255, .4) 77%, transparent 77%,
+    transparent
+  );
+}
+
+.markdown-body .progress-100plus .progress-bar {
+  background-color: #a6d796;
+}
+
+.markdown-body .progress-80plus .progress-bar {
+  background-color: #c6d796;
+}
+
+.markdown-body .progress-60plus .progress-bar {
+  background-color: #d7c896;
+}
+
+.markdown-body .progress-40plus .progress-bar {
+  background-color: #d7a796;
+}
+
+.markdown-body .progress-20plus .progress-bar {
+  background-color: #d796a6;
+}
+
+.markdown-body .progress-0plus .progress-bar {
+  background-color: #c25f77;
+}
+
+.markdown-body .candystripe-animate .progress-bar{
+  -webkit-animation: animate-stripes 3s linear infinite;
+  -moz-animation: animate-stripes 3s linear infinite;
+  animation: animate-stripes 3s linear infinite;
+}
+
+@-webkit-keyframes animate-stripes {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 60px 0;
+  }
+}
+
+@-moz-keyframes animate-stripes {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 60px 0;
+  }
+}
+
+@keyframes animate-stripes {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 60px 0;
+  }
+}
+
+.markdown-body .gloss .progress-bar {
+  box-shadow:
+    inset 0 4px 12px rgba(255, 255, 255, .7),
+    inset 0 -12px 0 rgba(0, 0, 0, .05);
+}
+
+/* Multimarkdown Critic Blocks */
+.markdown-body .critic_mark {
+  background: #ff0;
+}
+
+.markdown-body .critic_delete {
+  color: #c82829;
+  text-decoration: line-through;
+}
+
+.markdown-body .critic_insert {
+  color: #718c00 ;
+  text-decoration: underline;
+}
+
+.markdown-body .critic_comment {
+  color: #8e908c;
+  font-style: italic;
+}
+
+.markdown-body .headeranchor {
+  font: normal normal 16px octicons-anchor;
+  line-height: 1;
+  display: inline-block;
+  text-decoration: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.headeranchor:before {
+  content: '\f05c';
+}
+
+.markdown-body .task-list-item {
+  list-style-type: none;
+}
+
+.markdown-body .task-list-item+.task-list-item {
+  margin-top: 3px;
+}
+
+.markdown-body .task-list-item input {
+  margin: 0 4px 0.25em -20px;
+  vertical-align: middle;
+}
+
+/* Media */
+@media only screen and (min-width: 480px) {
+  .markdown-body {
+    font-size:14px;
+  }
+}
+
+@media only screen and (min-width: 768px) {
+  .markdown-body {
+    font-size:16px;
+  }
+}
+
+@media print {
+  .markdown-body * {
+    background: transparent !important;
+    color: black !important;
+    filter:none !important;
+    -ms-filter: none !important;
+  }
+
+  .markdown-body {
+    font-size:12pt;
+    max-width:100%;
+    outline:none;
+    border: 0;
+  }
+
+  .markdown-body a,
+  .markdown-body a:visited {
+    text-decoration: underline;
+  }
+
+  .markdown-body .headeranchor-link {
+    display: none;
+  }
+
+  .markdown-body a[href]:after {
+    content: " (" attr(href) ")";
+  }
+
+  .markdown-body abbr[title]:after {
+    content: " (" attr(title) ")";
+  }
+
+  .markdown-body .ir a:after,
+  .markdown-body a[href^="javascript:"]:after,
+  .markdown-body a[href^="#"]:after {
+    content: "";
+  }
+
+  .markdown-body pre {
+    white-space: pre;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .markdown-body pre,
+  .markdown-body blockquote {
+    border: 1px solid #999;
+    padding-right: 1em;
+    page-break-inside: avoid;
+  }
+
+  .markdown-body .progress,
+  .markdown-body .progress-bar {
+    -moz-box-shadow: none;
+    -webkit-box-shadow: none;
+    box-shadow: none;
+  }
+
+  .markdown-body .progress {
+    border: 1px solid #ddd;
+  }
+
+  .markdown-body .progress-bar {
+    height: 22px;
+    border-right: 1px solid #ddd;
+  }
+
+  .markdown-body tr,
+  .markdown-body img {
+    page-break-inside: avoid;
+  }
+
+  .markdown-body img {
+    max-width: 100% !important;
+  }
+
+  .markdown-body p,
+  .markdown-body h2,
+  .markdown-body h3 {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .markdown-body h2,
+  .markdown-body h3 {
+    page-break-after: avoid;
+  }
+}
+</style><title>README</title></head><body><article class="markdown-body"><h1 id="pyfc4"><a name="user-content-pyfc4" href="#pyfc4" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>pyfc4</h1>
+<p><img alt="Travis Build" src="https://travis-ci.org/ghukill/pyfc4.svg?branch=master" title="Travis Build" /></p>
+<p>Python client for Fedora Commons 4.</p>
+<h2 id="requirements"><a name="user-content-requirements" href="#requirements" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Requirements</h2>
+<ul>
+<li>Python 3.5+</li>
+<li><a href="(http://fedorarepository.org/)">Fedora Commons 4.7+</a></li>
+</ul>
+<h2 id="installation"><a name="user-content-installation" href="#installation" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Installation</h2>
+<pre><code>pip install -e .
+</code></pre>
+
+<h2 id="tests"><a name="user-content-tests" href="#tests" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Tests</h2>
+<p>Requires <code>pyfc4</code> installed as module, and without any configuration, an instance of FC4 running at <code>http://localhost:8080/rest</code>.</p>
+<pre><code>./runtests.sh
+</code></pre>
+
+<h2 id="basic-usage"><a name="user-content-basic-usage" href="#basic-usage" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Basic Usage</h2>
+<p>Assuming an instance of FC4 at <code>http://localhost:8080/rest</code></p>
+<ul>
+<li><a href="#instantiate-repository-handle">establishing repository connection</a></li>
+<li>creating resources<ul>
+<li><a href="#create-rdf-resources">RDF</a></li>
+<li><a href="#create-nonrdf-binary-resources">NonRDF</a></li>
+</ul>
+</li>
+<li><a href="#get-resources">retrieving resources</a></li>
+<li><a href="#resource-relationships">resource relationships</a><ul>
+<li><a href="#convenience-methods-for-children--parents">parents / children</a></li>
+<li><a href="#reading--writing-triples">reading / writing triples</a></li>
+<li><a href="#object-like-access">object-like access</a></li>
+</ul>
+</li>
+<li><a href="#transactions">transactions</a></li>
+<li><a href="#versioning">versioning</a></li>
+</ul>
+<h4 id="instantiate-repository-handle"><a name="user-content-instantiate-repository-handle" href="#instantiate-repository-handle" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Instantiate repository handle</h4>
+<pre><code>repo = Repository('http://localhost:8080/rest','username','password')
+</code></pre>
+
+<h4 id="create-rdf-resources"><a name="user-content-create-rdf-resources" href="#create-rdf-resources" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Create RDF Resources</h4>
+<p>Create <a href="https://www.w3.org/TR/ldp/#ldpbc">BasicContainer</a> with uri <code>foo</code>.  Adding <code>specifiy_true</code> to <code>create()</code> uses the HTTP verb <code>PUT</code>, and creates the resource at the desired URI:</p>
+<pre><code>foo = BasicContainer(repo, 'foo')
+foo.create(specify_uri=True) 
+</code></pre>
+
+<p>Create child resource <code>foo/bar</code> under <code>foo</code>:</p>
+<pre><code>bar = BasicContainer(repo, 'foo/bar')
+bar.create(specify_uri=True) 
+</code></pre>
+
+<p>Alternatively, use the built-in Fedora URI minter issuing <code>POST</code> requests by not setting <code>specify_uri</code> (which defaults to <code>False</code>).</p>
+<pre><code>In [1]: bc = BasicContainer(repo)
+In [2]: bc.create()
+Out[2]: True
+In [3]: bc.uri # check newly created and assigned resource uri
+Out[3]: rdflib.term.URIRef('http://localhost:8080/rest/c4/a1/12/f5/c4a112f5-ab38-476c-8ebc-75b221b18300')
+</code></pre>
+
+<h4 id="create-nonrdf-binary-resources"><a name="user-content-create-nonrdf-binary-resources" href="#create-nonrdf-binary-resources" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Create NonRDF (Binary) Resources</h4>
+<p>FC4, and LDP instances in general, also have <a href="https://www.w3.org/TR/ldp/#ldpnr">NonRDFSource</a> (Binary) resources.  These contain binary files.</p>
+<p>Create a binary resource <code>foo/baz</code> under <code>foo</code>.  This opens the file <code>README.md</code> as the binary content, and sets the mimetype as <code>text/plain</code>:</p>
+<pre><code>baz = Binary(repo, 'foo/baz') # 'Binary' is alias for 'NonRDFSource' which also works
+baz.binary.data = open('README.md','rb')
+baz.binary.mimetype = 'text/plain'
+baz.create(specify_uri=True)
+</code></pre>
+
+<p>Alternatively, you can also set the binary contents directly at <code>baz.binary.data</code>:</p>
+<pre><code>baz1 = Binary(repo, 'foo/baz1')
+baz1.binary.data = 'I see a little silhouetto of a man. Scaramouche, Scaramouche, will you do the fandango?'
+baz1.binary.mimetype = 'text/plain'
+baz1.create(specify_uri=True)
+</code></pre>
+
+<p>or, by providing a remote URL that Fedora will retrieve and attach to that NonRDF resource during creation:</p>
+<pre><code>baz2 = Binary(repo, 'foo/baz2')
+baz2.binary.location = 'http://example.org/image.jpg'
+baz2.binary.mimetype = 'image/jpeg'
+baz2.create(specify_uri=True)
+</code></pre>
+
+<h4 id="get-resources"><a name="user-content-get-resources" href="#get-resources" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Get Resources</h4>
+<p>To retrieve resources to work with, the repository instance <code>repo</code> has method <code>get_resource</code> that returns a <code>Resource</code> instance of that URI.  <code>get_resource</code> will accept the full URI, <code>http://localhost:8080/rest/foo</code>, a &ldquo;short&rdquo; uri, <code>foo</code>, or an <code>rdflib.term.URIRef</code> instance, <code>rdflib.term.URIRef('http://localhost:8080/rest/foo')</code>:</p>
+<pre><code># all have same result
+foo = repo.get_resource('http://localhost:8080/rest/foo')
+foo = repo.get_resource('foo')
+foo = repo.get_resource(rdflib.term.URIRef('http://localhost:8080/rest/foo'))
+</code></pre>
+
+<p>When <code>HEAD</code> request for resource returns HTTP status code <code>200</code>, <code>foo.exists</code> is set to <code>True</code>:</p>
+<pre><code>In [8]: foo.exists
+Out[8]: True
+</code></pre>
+
+<p>Resources also contain the method <code>check_exists</code> to ping the repository with a <code>HEAD</code> request and update the attribute <code>.exists</code>:</p>
+<pre><code>In [9]: foo.check_exists()
+Out[9]: True
+</code></pre>
+
+<p>Resources have the attribute <code>.uri</code> which returns a <code>rdflib.term.URIRef</code> instance, or optionally, can be returned as a string:</p>
+<pre><code>In [6]: foo.uri
+Out[6]: rdflib.term.URIRef('http://localhost:8080/rest/foo')
+
+In [7]: foo.uri_as_string()
+Out[7]: 'http://localhost:8080/rest/foo'
+</code></pre>
+
+<p>Retrieving resources that do not exist will return <code>False</code>:</p>
+<pre><code>i_do_not_exist = repo.get_resource('xyz123')
+In [5]: i_do_not_exist
+Out[5]: False
+</code></pre>
+
+<p>Retrieving NonRDFSources is similar to RDFSources, with the addition of a <code>self.binary</code> section.  The <code>self.binary.mimetype</code> is retrieved from the resource&rsquo;s graph, while the binary data itself is made ready for access, <em>but not downloaded</em>, at <code>self.binary.data</code> as a <code>requests.models.Response</code> instance.  </p>
+<p>The easiest and most performant way to use this data is to use a requests object&rsquo;s built-in <code>.iter_content</code> method.</p>
+<p>For example:<br />
+<pre><code># retrieve binary resource
+
+</code></pre></p>
+<h4 id="resource-relationships"><a name="user-content-resource-relationships" href="#resource-relationships" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Resource relationships</h4>
+<h5 id="convenience-methods-for-children-parents"><a name="user-content-convenience-methods-for-children-parents" href="#convenience-methods-for-children-parents" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Convenience methods for children / parents</h5>
+<p>Based on the predicate <code>ldp:contains</code>, get children of resource:</p>
+<pre><code>In [2]: foo.children()
+Out[2]: 
+[rdflib.term.URIRef('http://localhost:8080/rest/foo/baz'),
+ rdflib.term.URIRef('http://localhost:8080/rest/foo/bar')]
+</code></pre>
+
+<p>Optionally, return pyfc4 <code>Resource</code> instances of child objects:</p>
+<pre><code>In [3]: foo.children(as_resources=True)
+Out[3]: 
+[&lt;NonRDFSource Resource, uri: http://localhost:8080/rest/foo/baz&gt;,
+ &lt;BasicContainer Resource, uri: http://localhost:8080/rest/foo/bar&gt;]
+</code></pre>
+
+<p>Based on the predicate <code>fedora:hasParent</code>, get parent of resource:</p>
+<pre><code>In [4]: bar.parents()
+Out[4]: [rdflib.term.URIRef('http://localhost:8080/rest/foo')]
+</code></pre>
+
+<p>Again, can return parent as pyfc4 <code>Resource</code> instance:</p>
+<pre><code>In [5]: bar.parents(as_resources=True)
+Out[5]: [&lt;BasicContainer Resource, uri: http://localhost:8080/rest/foo&gt;]
+</code></pre>
+
+<h5 id="reading-writing-triples"><a name="user-content-reading-writing-triples" href="#reading-writing-triples" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Reading / writing triples</h5>
+<p>When working with triples for a resource, the subject for all triples is assumed to be the URI of the resource itself.  Additionally, resources come with some predefind prefixes for ease of use.  These can be found under <code>foo.rdf.prefixes</code>, and derive from the repository instance at <code>repo.context</code>.</p>
+<p>All modifications are written to the parsed graph for a resource under <code>foo.rdf.graph</code>, but are <em>not</em> written to repository intsance of the resource.  This allows for batch modifying, without multiple request/responses from the server.</p>
+<p>To add triples, pass a predicate and an object:</p>
+<pre><code># using built-in prefixes, and a string literal
+foo.add_triple(foo.rdf.prefixes.dc.subject, 'minty')
+
+# example of a foaf predicate, pointing to another resource
+foo.add_triple(foo.rdf.prefixes.foaf.knows, bar.uri)
+</code></pre>
+
+<p>To commit these modifications to the resource&rsquo;s graph, use the method <code>.update</code>.  This sends the updated graph as a <code>PATCH</code> request, then retrieves the updated graph and sets that to the resource instance.</p>
+<pre><code>foo.update()
+</code></pre>
+
+<p>Removing triples is similar to adding, passing a predicate and an object:</p>
+<pre><code>foo.remove_triple(foo.rdf.prefixes.dc.subject, 'minty')
+foo.update()
+</code></pre>
+
+<p><strong>Note:</strong> Multiple additions and removals can happen before issuing <code>.update()</code>.  All modifications are stored locally in a graph, then diffed against the last known graph from the repository, and only changes are sent.</p>
+<p>In addition to the default prefixes/namespaces, you can instantiate a repository instance with additional prefixes that will trickle through and be available in similar fashion:</p>
+<pre><code># instantiate repository with additional GeoNames prefix 'gn'
+repo = Repository('http://localhost:8080/rest','username','password', context={'gn':'http://www.geonames.org/ontology#'})
+DEBUG:pyfc4.models:context provided, merging with defaults
+
+# create resource
+goober = BasicContainer(repo, 'goober')
+goober.create(specify_uri=True)
+
+# add triple using GeoNames prefix 'gn'
+goober.add_triple(goober.rdf.prefixes.gn.countryCode, 'FR')
+goober.update()
+
+# retrieve triples with gn.countryCode predicate, note that 'gn' prefix is expanded in triple creation and retrieval
+for t in goober.triples(p=goober.rdf.prefixes.gn.countryCode):
+    print(t)
+(rdflib.term.URIRef('http://localhost:8080/rest/goober'), rdflib.term.URIRef('http://www.geonames.org/ontology#countryCode'), rdflib.term.Literal('FR'))
+</code></pre>
+
+<h5 id="object-like-access"><a name="user-content-object-like-access" href="#object-like-access" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Object-like access</h5>
+<p>Somewhat of a convenience addition, you can access triples parsed from a resource&rsquo;s graph in an object-like fashion.  For example:</p>
+<pre><code># get ldp:contains 
+In [6]: foo.rdf.triples.ldp.contains
+Out[6]:
+[rdflib.term.URIRef('http://localhost:8080/rest/foo/bar'),
+ rdflib.term.URIRef('http://localhost:8080/rest/foo/baz')]
+
+# In [8]: goober.rdf.triples.foaf.knows
+Out[8]: [rdflib.term.URIRef('http://localhost:8080/rest/tronic/tronic2')]
+
+# a more complete example of how this trickles through
+# add namespace
+In [9]: foo.add_namespace('licorice','http://licorice.org#')
+
+# add triple
+In [10]: foo.add_triple(foo.rdf.prefixes.licorice.best_color, 'black')
+
+# update
+In [11]: foo.update()
+Out[11]: True
+
+# now, object-like access to this triple parsed from graph
+In [12]: foo.rdf.triples.licorice.best_color
+Out[12]: [rdflib.term.Literal('black', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))]
+</code></pre>
+
+<h4 id="transactions"><a name="user-content-transactions" href="#transactions" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Transactions</h4>
+<p>pyfc4 also supports use of <a href="https://wiki.duraspace.org/display/FEDORA40/Transactions">Transactions</a> in FC4.  Transactions allow for work to be done on resources in the repository within a contained session, with the ability to commit or roll back changes made within that session.</p>
+<p>From a practical point of view, in FC4, transactions are a prefix attached to all URIs that indicate these resources are part of, and being modified within, that transaction.  So, where the base path may have originally been, <code>http://localhost:8080/rest</code>, for a scoped transaction, the base path might become something like, <code>http://localhost:8080/rest/txn:123456789/</code>.</p>
+<p>In pyfc4, transaction are spawned from a repository instance, given a name (either declared or minted), and stored in a dictionary at <code>repo.txns</code>.  Multiple transactions may be running at one time.  Transaction also expire, automatically, after three minutes of non-use.</p>
+<p>For example, to start a new transaction called <code>postcard_ingest</code> to handle the ingest of a handful of resources that relate to a single image: </p>
+<pre><code>In [1]: postcard_txn = repo.start_txn('postcard_txn')
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest//fcr:tx, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 &quot;POST /rest//fcr:tx HTTP/1.1&quot; 201 0
+DEBUG:pyfc4.models:spawning transaction: http://localhost:8080/rest/tx:12f2534f-b088-4a03-8546-54ad6bec3c9b
+DEBUG:pyfc4.models:context provided, merging with defaults
+</code></pre>
+
+<p>At any time, you can confirm whether or not a transaction exists, and view when it will expire:<br />
+<pre><code>In [3]: postcard_txn.active
+Out[3]: True
+In [4]: postcard_txn.expires
+Out[4]: 'Thu, 03 Aug 2017 19:40:50 GMT'
+</code></pre></p>
+<p>To keep a transaction alive:<br />
+<pre><code>In [5]: postcard_txn.keep_alive()
+Out[5]: True
+
+In [6]: postcard_txn.expires
+Out[6]: 'Thu, 03 Aug 2017 19:42:32 GMT' # notice bumped time
+</code></pre></p>
+<p>You can also fire transactions without declaring a name, and receive an automatically generated one:<br />
+<pre><code>In [7]: txn = repo.start_txn()
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest//fcr:tx, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 &quot;POST /rest//fcr:tx HTTP/1.1&quot; 201 0
+DEBUG:pyfc4.models:spawning transaction: http://localhost:8080/rest/tx:bee8fb1f-4b91-438e-bf95-c5484bd4a8d6
+DEBUG:pyfc4.models:context provided, merging with defaults
+
+In [8]: txn.name
+Out[8]: '9d4eff000e8d40bf913ac8424725799b'
+</code></pre></p>
+<p>Multiple transactions can exist for a single repository instance:<br />
+<pre><code>In [9]: repo.txns
+Out[9]:
+{'9d4eff000e8d40bf913ac8424725799b': &lt;pyfc4.models.Transaction at 0x105ebbef0&gt;,
+ 'postcard_txn': &lt;pyfc4.models.Transaction at 0x106871b00&gt;}
+ ```
+
+ While a transaction is open, you can use just like a normal repository instance.  Here's an example of creating a resource, passing a transacation as the repository instance:
+ ```
+ blackberry = BasicContainer(postcard_txn,'blackberry')
+ blackberry.create(specify_uri=True)
+ Out[16]: True
+ ```
+
+ Then, when ready to commit changes that have occurred within the transaction:
+ ```
+In [18]: postcard_txn.commit()
+DEBUG:pyfc4.models:POST request for http://localhost:8080/rest/tx:12f2534f-b088-4a03-8546-54ad6bec3c9b/fcr:tx/fcr:commit, format None, headers None
+DEBUG:urllib3.connectionpool:Starting new HTTP connection (1): localhost
+DEBUG:urllib3.connectionpool:http://localhost:8080 &quot;POST /rest/tx:12f2534f-b088-4a03-8546-54ad6bec3c9b/fcr:tx/fcr:commit HTTP/1.1&quot; 204 0
+DEBUG:pyfc4.models:commit for transaction: http://localhost:8080/rest/tx:12f2534f-b088-4a03-8546-54ad6bec3c9b/, successful
+Out[18]: True
+
+In [19]: postcard_txn.active
+Out[19]: False
+</code></pre></p>
+<p>Conversely, to rollback all changes that occurred within a transaction:<br />
+<pre><code>postcard_txn.rollback()
+</code></pre></p>
+<h4 id="versioning"><a name="user-content-versioning" href="#versioning" class="headeranchor-link" aria-hidden="true"><span class="headeranchor"></span></a>Versioning</h4>
+<p>pyfc4 also supports some versioning of resources.  Most interactions, if not all, involve the URL pattern <code>/foo/fcr:versions</code>.  Versions represent a state of a resource, including the RDF information, and binary files associated with a NonRDFSource.  They can be created, retrieved, reverted to, and deleted.</p>
+<p>Create a new version:<br />
+<pre><code># only argument is a string value to serve as a label for the version
+foo.create_version('v1')
+</code></pre></p>
+<p>You can see this version was created and saved to <code>foo.versions</code>:<br />
+<pre><code>In [24]: foo.versions
+Out[24]: namespace(v1=&lt;ResourceVersion Resource, uri: http://localhost:8080/rest/foo/fcr:versions/v1&gt;)
+</code></pre></p>
+<p>When a resource is retrieved, previous versions are <em>not</em> automatically retrieved, for performance reasons.  However, previous versions can all be retrieved and found at <code>foo.versions</code>:<br />
+<pre><code>foo.get_versions()
+In [29]: foo.versions
+Out[29]: namespace(v1=&lt;ResourceVersion Resource, uri: http://localhost:8080/rest/foo/fcr:versions/v1&gt;)
+</code></pre></p>
+<p>Each version is an instance of the class <code>ResourceVersion</code> that includes a couple methods.  One, is to revert the current resource to that version:<br />
+<pre><code>foo.versions.v1.revert_to()
+</code></pre></p>
+<p>Another, is to delete that version from the resource&rsquo;s history:<br />
+<pre><code>foo.versions.v1.delete()
+</code></pre></p>
+<p>Each <code>ResourceVersion</code> instance contains that version of the resource at <code>.resource</code>, fully parsed, and available for investigating:<br />
+<pre><code>In [32]: foo.versions.v1.resource.rdf.triples.ldp.contains
+Out[32]: 
+[rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/bar'),
+ rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/baz')]
+
+In [33]: foo.versions.v1.resource.children()
+Out[33]: 
+[rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/baz'),
+ rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/bar')]
+</code></pre><br />
+<strong>Note:</strong> Resource versions cannot be modified, rendering <code>version.update()</code> useless.</p></article></body></html>
