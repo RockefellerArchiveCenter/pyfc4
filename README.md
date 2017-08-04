@@ -166,6 +166,13 @@ for chunk in baz.binary.data.iter_content(1024): using 1024 byte chunk size
   # do things with chunk
 ```
 
+You can also return specific byte ranges with a built-in convenience function, `self.binary.range` that expects the beginning and end of the range, with an optional `stream` parameter:
+```
+# iterate through bytes 500-1000
+for chunk in baz.binary.range(500,1000).iter_content(1024):
+  # do things with chunk
+```
+
 #### Resource relationships
 
 ##### Convenience methods for children / parents

@@ -1567,6 +1567,7 @@ class NonRDFSource(Resource):
 		self.binary.stream = False
 		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
 		self.binary.location = None
+		self.binary.range = self.byte_range
 
 
 	def _prep_binary_data(self):
@@ -1704,6 +1705,34 @@ class NonRDFSource(Resource):
 			'verdict':verdict,
 			'premis_graph':fixity_graph
 		}
+
+
+	def byte_range(self, byte_start, byte_end, stream=False):
+
+		'''
+		method to return a particular byte range from NonRDF resource's binary data
+		https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+
+		Args:
+			byte_start(int): position of range start 
+			byte_end(int): position of range end
+
+		Returns:
+			(requests.Response): streamable response
+		'''
+
+		response = self.repo.api.http_request(
+			'GET',
+			self.uri,
+			data=None,
+			headers={
+				'Content-Type':self.binary.mimetype,
+				'Range':'bytes=%s-%s' % (byte_start, byte_end)
+			},
+			is_rdf=False,
+			stream=stream)
+
+		return response
 
 
 # 'Binary' is an alias for NonRDFSource
