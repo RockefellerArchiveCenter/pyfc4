@@ -1344,8 +1344,6 @@ class Resource(object):
 
 
 
-
-
 # NonRDF Source
 class NonRDFSource(Resource):
 
