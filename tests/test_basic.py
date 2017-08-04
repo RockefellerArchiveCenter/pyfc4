@@ -164,6 +164,15 @@ class TestBasicCRUDPUT(object):
 		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
 		assert baz.exists
 
+		# view data in one memory download
+		assert baz.binary.data.content.decode('utf-8') == 'this is a test, this is only a test'
+
+		# chunk download of data (tiny chunks)
+		final_string = ''
+		for chunk in baz.binary.data.iter_content(5):
+			final_string += chunk.decode('utf-8')
+		assert final_string == 'this is a test, this is only a test'
+
 
 	# create BasicContainer with NonRDFSource attributes, expect exception
 	def create_resource_type_mismatch(self):
