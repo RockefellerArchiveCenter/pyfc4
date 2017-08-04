@@ -602,7 +602,15 @@ class TestVersions(object):
 		# assert new triple does not exist
 		assert not hasattr(foo.rdf.triples.dc, 'coverage')
 
-		
+
+	def create_binary_version(self):
+
+		# get baz
+		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
+
+		# create versions and confirm exists
+		v1 = baz.create_version('v1')
+		assert type(baz.versions.v1) == ResourceVersion	
 
 
 ########################################################

@@ -152,6 +152,10 @@ class Repository(object):
 		# handle uri
 		uri = self.parse_uri(uri)
 
+		# remove fcr:metadata if included, as handled below
+		if uri.toPython().endswith('/fcr:metadata'):
+			uri = rdflib.term.URIRef(uri.toPython().rstrip('/fcr:metadata'))
+
 		# HEAD request to detect resource type
 		head_response = self.api.http_request('HEAD', uri)
 

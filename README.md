@@ -37,6 +37,7 @@ Assuming an instance of FC4 at `http://localhost:8080/rest`
     * [reading / writing triples](#reading--writing-triples)
     * [object-like access](#object-like-access)
   * [transactions](#transactions)
+  * [versioning](#versioning)
 
 
 #### Instantiate repository handle
@@ -343,3 +344,76 @@ Conversely, to rollback all changes that occurred within a transaction:
 ```
 postcard_txn.rollback()
 ```
+
+#### Versioning
+
+pyfc4 also supports some versioning of resources.  Most interactions, if not all, involve the URL pattern `/foo/fcr:versions`.  Versions represent a state of a resource, including the RDF information, and binary files associated with a NonRDFSource.  They can be created, retrieved, reverted to, and deleted.
+
+Create a new version:
+```
+# only argument is a string value to serve as a label for the version
+foo.create_version('v1')
+```
+
+You can see this version was created and saved to `foo.versions`:
+```
+In [24]: foo.versions
+Out[24]: namespace(v1=<ResourceVersion Resource, uri: http://localhost:8080/rest/foo/fcr:versions/v1>)
+```
+
+When a resource is retrieved, previous versions are *not* automatically retrieved, for performance reasons.  However, previous versions can all be retrieved and found at `foo.versions`:
+```
+foo.get_versions()
+In [29]: foo.versions
+Out[29]: namespace(v1=<ResourceVersion Resource, uri: http://localhost:8080/rest/foo/fcr:versions/v1>)
+```
+
+Each version is an instance of the class `ResourceVersion` that includes a couple methods.  One, is to revert the current resource to that version:
+```
+foo.versions.v1.revert_to()
+```
+
+Another, is to delete that version from the resource's history:
+```
+foo.versions.v1.delete()
+```
+
+Each `ResourceVersion` instance contains that version of the resource at `.resource`, fully parsed, and available for investigating:
+```
+In [32]: foo.versions.v1.resource.rdf.triples.ldp.contains
+Out[32]: 
+[rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/bar'),
+ rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/baz')]
+
+In [33]: foo.versions.v1.resource.children()
+Out[33]: 
+[rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/baz'),
+ rdflib.term.URIRef('http://localhost:8080/rest/foo/fcr:versions/v1/bar')]
+```
+**Note:** Resource versions cannot be modified, rendering `version.update()` useless.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
