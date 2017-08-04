@@ -1548,7 +1548,6 @@ class NonRDFSource(Resource):
 			stream=True)
 
 
-
 	def _build_binary(self):
 
 		'''
@@ -1657,6 +1656,54 @@ class NonRDFSource(Resource):
 				else:
 					logger.debug('detected bytes')
 					self.binary.delivery = 'payload'
+
+
+	def fixity(self, response_format=None):
+
+		'''
+		Issues fixity check, return parsed graph
+
+		Args:
+			None
+
+		Returns:
+			(dict): ('verdict':(bool): verdict of fixity check, 'premis_graph':(rdflib.Graph): parsed PREMIS graph from check)
+		'''
+
+		# if no response_format, use default
+		if not response_format:
+			response_format = self.repo.default_serialization
+
+		# issue GET request for fixity check
+		response = self.repo.api.http_request('GET', '%s/fcr:fixity' % self.uri)
+
+		# parse
+		if response.headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = response.headers['Content-Type']
+
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse graph	
+		fixity_graph = rdflib.Graph().parse(
+			data=response.content.decode('utf-8'),
+			format=parse_format)
+
+		# determine verdict		
+		for outcome in fixity_graph.objects(None, self.rdf.prefixes.premis.hasEventOutcome):
+			if outcome.toPython() == 'SUCCESS':
+				verdict = True
+			else:
+				verdict = False
+
+		return {
+			'verdict':verdict,
+			'premis_graph':fixity_graph
+		}
 
 
 # 'Binary' is an alias for NonRDFSource

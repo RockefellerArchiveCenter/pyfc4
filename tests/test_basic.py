@@ -622,6 +622,20 @@ class TestVersions(object):
 		assert type(baz.versions.v1) == ResourceVersion	
 
 
+# versioning
+class TestFixity(object):
+
+	def test_fixity_check(self):
+
+		# test foo/baz
+		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
+		fixity_check = baz.fixity()
+
+		assert 'verdict' in fixity_check.keys()
+		assert 'premis_graph' in fixity_check.keys()
+		assert type(fixity_check['premis_graph']) == rdflib.Graph
+
+
 ########################################################
 # TEARDOWN
 ########################################################
