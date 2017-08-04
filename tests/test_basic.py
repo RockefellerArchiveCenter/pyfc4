@@ -164,6 +164,15 @@ class TestBasicCRUDPUT(object):
 		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
 		assert baz.exists
 
+		# view data in one memory download
+		assert baz.binary.data.content.decode('utf-8') == 'this is a test, this is only a test'
+
+		# chunk download of data (tiny chunks)
+		final_string = ''
+		for chunk in baz.binary.data.iter_content(5):
+			final_string += chunk.decode('utf-8')
+		assert final_string == 'this is a test, this is only a test'
+
 
 	# create BasicContainer with NonRDFSource attributes, expect exception
 	def create_resource_type_mismatch(self):
@@ -540,7 +549,77 @@ class TestMovingCopying(object):
 		# test
 		assert ephem2.exists
 		assert ephem3.exists
-		
+
+
+
+# versioning
+class TestVersions(object):
+
+	def test_create_versions(self):
+
+		# get foo
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+
+		# create version before modification
+		v1 = foo.create_version('v1')
+		assert type(foo.versions.v1) == ResourceVersion
+		v2 = foo.create_version('v2')
+		assert type(foo.versions.v2) == ResourceVersion
+
+
+	def test_retrieve_versions(self):
+
+		# get foo
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+
+		# retrieve versions
+		foo.get_versions()
+		assert type(foo.versions.v1) == ResourceVersion
+		assert type(foo.versions.v2) == ResourceVersion
+
+
+	def test_delete_version(self):
+
+		# get foo and versions
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+		foo.get_versions()
+
+		# assert cannot delete v2, as most recent
+		with pytest.raises(Exception) as excinfo:
+			foo.versions.v2.delete()
+		assert 'code 400' in str(excinfo.value)
+
+		# but delete v1
+		foo.versions.v1.delete()
+		assert not hasattr(foo.versions, 'v1')
+
+
+	def test_revert_to_version(self):
+
+		# get foo
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+
+		# add triple
+		foo.add_triple(foo.rdf.prefixes.dc.coverage, 'forest')
+		foo.update()
+		assert foo.rdf.triples.dc.coverage[0] == rdflib.term.Literal('forest', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))
+
+		# get versions and revert to foo_v1 (pre triple)
+		foo.get_versions()
+		foo.versions.v2.revert_to()
+
+		# assert new triple does not exist
+		assert not hasattr(foo.rdf.triples.dc, 'coverage')
+
+
+	def create_binary_version(self):
+
+		# get baz
+		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
+
+		# create versions and confirm exists
+		v1 = baz.create_version('v1')
+		assert type(baz.versions.v1) == ResourceVersion	
 
 
 ########################################################

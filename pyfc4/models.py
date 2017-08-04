@@ -152,6 +152,10 @@ class Repository(object):
 		# handle uri
 		uri = self.parse_uri(uri)
 
+		# remove fcr:metadata if included, as handled below
+		if uri.toPython().endswith('/fcr:metadata'):
+			uri = rdflib.term.URIRef(uri.toPython().rstrip('/fcr:metadata'))
+
 		# HEAD request to detect resource type
 		head_response = self.api.http_request('HEAD', uri)
 
@@ -604,27 +608,28 @@ class SparqlUpdate(object):
 		# derive namespaces to include prefixes in Sparql update query
 		self._derive_namespaces()
 
-		q = ''
+		sparql_query = ''
 
 		# add prefixes
 		for ns_prefix, ns_uri in self.update_prefixes.items():
-			q += "PREFIX %s: <%s>\n" % (ns_prefix, str(ns_uri))
+			sparql_query += "PREFIX %s: <%s>\n" % (ns_prefix, str(ns_uri))
 
 		# deletes
 		removed_serialized = self.diffs.removed.serialize(format='nt').decode('utf-8')
-		q += '\nDELETE {\n%s}\n\n' % removed_serialized
+		sparql_query += '\nDELETE {\n%s}\n\n' % removed_serialized
 
 		# inserts
 		added_serialized = self.diffs.added.serialize(format='nt').decode('utf-8')
-		q += '\nINSERT {\n%s}\n\n' % added_serialized
+		sparql_query += '\nINSERT {\n%s}\n\n' % added_serialized
 
 		# where (not yet implemented)
-		q += 'WHERE {}'
+		sparql_query += 'WHERE {}'
 
 		# debug
-		logger.debug(q)
+		# logger.debug(sparql_query)
 
-		return q
+		# return query
+		return sparql_query
 
 
 
@@ -675,6 +680,9 @@ class Resource(object):
 		# RDF
 		self._build_rdf(data=data)
 
+		# versions
+		self.versions = SimpleNamespace()
+
 
 	def __repr__(self):
 		return '<%s Resource, uri: %s>' % (self.__class__.__name__, self.uri)
@@ -715,7 +723,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False):
 
 		'''
 		Primary method to create resources.
@@ -755,7 +763,7 @@ class Resource(object):
 				self.headers['Content-Type'] = serialization_format
 			
 			# fire creation request
-			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers)
+			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers, stream=stream)
 			return self._handle_create(response, ignore_tombstone)
 			
 
@@ -933,6 +941,8 @@ class Resource(object):
 			# update graph if RDFSource
 			if type(self) != NonRDFSource:
 				self._parse_graph()
+			# empty versions
+			self.versions = SimpleNamespace()
 			# cleanup
 			del(updated_self)
 		else:
@@ -961,7 +971,6 @@ class Resource(object):
 		for prefix,uri in self.repo.context.items():
 			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
 		# graph
-		self.rdf.triples = SimpleNamespace() # prepare triples
 		self._parse_graph()
 
 
@@ -1013,6 +1022,7 @@ class Resource(object):
 		self.rdf._orig_graph = copy.deepcopy(self.rdf.graph)
 
 		# parse triples as object-like attributes in self.rdf.triples
+		self.rdf.triples = SimpleNamespace() # prepare triples
 		for s,p,o in self.rdf.graph:
 			
 			# get ns info
@@ -1085,25 +1095,7 @@ class Resource(object):
 		self.rdf.namespace_manager.bind(ns_prefix, ns_uri, override=False)
 
 
-	def _build_binary(self):
-
-		'''
-		builds binary attributes for resource
-
-		Args:
-			None
-
-		Return:
-			None: sets various attributes
-		'''
-
-		# binary data
-		self.binary = SimpleNamespace()
-		self.binary.delivery = None
-		self.binary.data = None
-		self.binary.stream = False
-		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
-		self.binary.location = None
+	
 
 
 	def _empty_resource_attributes(self):
@@ -1343,6 +1335,157 @@ class Resource(object):
 		return list(siblings)
 
 
+	def _affix_version(self, version_uri, version_label):
+
+		# retrieve version
+		version_resource = self.repo.get_resource(version_uri)
+
+		# instantiate ResourceVersion
+		rv = ResourceVersion(self, version_resource, version_uri, version_label)
+
+		# append to self.versions
+		setattr(self.versions, version_label, rv)
+
+
+	def create_version(self, version_label):
+
+		'''
+		method to create a new version of the resource as it currently stands
+			
+			- Note: this will create a version based on the current live instance of the resource,
+			not the local version, which might require self.update() to update.
+
+		Args:
+			version_label (str): label to be used for version
+
+		Returns:
+			(ResourceVersion): instance of ResourceVersion, also appended to self.versions
+		'''
+
+		# create version
+		version_response = self.repo.api.http_request('POST', '%s/fcr:versions' % self.uri, data=None, headers={'Slug':version_label})
+
+		# if 201, assume success
+		if version_response.status_code == 201:
+			logger.debug('version created: %s' % version_response.headers['Location'])
+
+			# affix version
+			self._affix_version(version_response.headers['Location'], version_label)
+
+
+	def get_versions(self):
+
+		'''
+		retrieves all versions of an object, and stores them at self.versions
+
+		Args:
+			None
+
+		Returns:
+			None: appends instances 
+		'''
+
+		# get all versions
+		versions_response = self.repo.api.http_request('GET', '%s/fcr:versions' % self.uri)
+
+		# parse response
+		# handle edge case for content-types not recognized by rdflib parser
+		if versions_response.headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = versions_response.headers['Content-Type']
+
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse graph	
+		versions_graph = rdflib.Graph().parse(
+			data=versions_response.content.decode('utf-8'),
+			format=parse_format)
+
+		# loop through fedora.hasVersion
+		for version_uri in versions_graph.objects(self.uri, self.rdf.prefixes.fedora.hasVersion):
+
+			# get label
+			version_label = versions_graph.value(version_uri, self.rdf.prefixes.fedora.hasVersionLabel, None).toPython()
+
+			# affix version
+			self._affix_version(version_uri, version_label)
+
+
+
+class ResourceVersion(Resource):
+
+	'''
+	Class to represent versions of a resource.
+
+	Versions are spawned by the Resource class method resource.create_version(), or retrieved by resource.get_versions().
+	Versions are stored in the resource instance at resource.versions
+
+	Args:
+		version_resource (Resource): retrieved and prased resource version
+		version_uri (rdflib.term.URIRef, str): uri of version
+		version_label (str): lable for version
+	'''
+
+	def __init__(self, current_resource, version_resource, version_uri, version_label):
+
+		self._current_resource = current_resource
+		self.resource = version_resource
+		self.uri = version_uri
+		self.label = version_label
+
+
+	def revert_to(self):
+		
+		'''
+		method to revert resource to this version by issuing PATCH
+
+		Args:
+			None
+
+		Returns:
+			None: sends PATCH request, and refreshes parent resource
+		'''
+		
+		# send patch
+		response = self.resource.repo.api.http_request('PATCH', self.uri)
+
+		# if response 204
+		if response.status_code == 204:
+			logger.debug('reverting to previous version of resource, %s' % self.uri)
+
+			# refresh current resource handle
+			self._current_resource.refresh()
+
+		else:
+			raise Exception('could not revert to resource version: %s' % self.uri)
+
+
+	def delete(self):
+
+		'''
+		method to remove version from resource's history
+		'''
+		
+		# send patch
+		response = self.resource.repo.api.http_request('DELETE', self.uri)
+
+		# if response 204
+		if response.status_code == 204:
+			logger.debug('deleting previous version of resource, %s' % self.uri)
+
+			# remove from resource versions
+			delattr(self._current_resource.versions, self.label)
+
+		# if 400, likely most recent version and cannot remove
+		elif response.status_code == 400:
+			raise Exception('code 400, likely most recent resource version which cannot be removed')
+
+		else:
+			raise Exception('could not delete resource version: %s' % self.uri)
 
 
 
@@ -1353,6 +1496,9 @@ class NonRDFSource(Resource):
 	Linked Data Platform Non-RDF Source (LDP-NR)
 	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
 	https://www.w3.org/TR/ldp/
+
+	Note: When a pre-existing NonRDFSource is retrieved, the binary data is stored under self.binary.data as a
+	streamable requests object.
 
 	Inherits:
 		Resource
@@ -1373,27 +1519,55 @@ class NonRDFSource(Resource):
 		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
 
 		# binary data
+		self._build_binary()
+		
+		# like RDF, if exists, retrieve binary data
+		if self.exists:
+			self.parse_binary()
+			
+
+	def parse_binary(self):
+
+		'''
+		when retrieving a NonRDF resource, parse binary data and make available
+		via generators
+		'''
+
+		# derive mimetype
+		self.binary.mimetype = self.rdf.graph.value(
+			self.uri,
+			self.rdf.prefixes.ebucore.hasMimeType).toPython()
+		
+		# get binary content as stremable response
+		self.binary.data = self.repo.api.http_request(
+			'GET',
+			self.uri,
+			data=None,
+			headers={'Content-Type':self.binary.mimetype},
+			is_rdf=False,
+			stream=True)
+
+
+
+	def _build_binary(self):
+
+		'''
+		builds binary attributes for resource
+
+		Args:
+			None
+
+		Return:
+			None: sets various attributes
+		'''
+
+		# binary data
 		self.binary = SimpleNamespace()
 		self.binary.delivery = None
 		self.binary.data = None
 		self.binary.stream = False
 		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
 		self.binary.location = None
-		
-		# like RDF, if exists, retrieve binary data
-		if self.exists:
-
-			# get mimetype
-			self.binary.mimetype = self.rdf.graph.value(
-				self.uri,
-				self.rdf.prefixes.ebucore.hasMimeType).toPython()
-			self.binary.data = self.repo.api.http_request(
-				'GET',
-				self.uri,
-				data=None,
-				headers={'Content-Type':self.binary.mimetype},
-				is_rdf=False,
-				stream=True).content
 
 
 	def _prep_binary_data(self):
