@@ -604,27 +604,28 @@ class SparqlUpdate(object):
 		# derive namespaces to include prefixes in Sparql update query
 		self._derive_namespaces()
 
-		q = ''
+		sparql_query = ''
 
 		# add prefixes
 		for ns_prefix, ns_uri in self.update_prefixes.items():
-			q += "PREFIX %s: <%s>\n" % (ns_prefix, str(ns_uri))
+			sparql_query += "PREFIX %s: <%s>\n" % (ns_prefix, str(ns_uri))
 
 		# deletes
 		removed_serialized = self.diffs.removed.serialize(format='nt').decode('utf-8')
-		q += '\nDELETE {\n%s}\n\n' % removed_serialized
+		sparql_query += '\nDELETE {\n%s}\n\n' % removed_serialized
 
 		# inserts
 		added_serialized = self.diffs.added.serialize(format='nt').decode('utf-8')
-		q += '\nINSERT {\n%s}\n\n' % added_serialized
+		sparql_query += '\nINSERT {\n%s}\n\n' % added_serialized
 
 		# where (not yet implemented)
-		q += 'WHERE {}'
+		sparql_query += 'WHERE {}'
 
 		# debug
-		logger.debug(q)
+		# logger.debug(sparql_query)
 
-		return q
+		# return query
+		return sparql_query
 
 
 
@@ -674,6 +675,9 @@ class Resource(object):
 
 		# RDF
 		self._build_rdf(data=data)
+
+		# versions
+		self.versions = SimpleNamespace()
 
 
 	def __repr__(self):
@@ -961,7 +965,6 @@ class Resource(object):
 		for prefix,uri in self.repo.context.items():
 			setattr(self.rdf.prefixes, prefix, rdflib.Namespace(uri))
 		# graph
-		self.rdf.triples = SimpleNamespace() # prepare triples
 		self._parse_graph()
 
 
@@ -1013,6 +1016,7 @@ class Resource(object):
 		self.rdf._orig_graph = copy.deepcopy(self.rdf.graph)
 
 		# parse triples as object-like attributes in self.rdf.triples
+		self.rdf.triples = SimpleNamespace() # prepare triples
 		for s,p,o in self.rdf.graph:
 			
 			# get ns info
@@ -1341,6 +1345,124 @@ class Resource(object):
 			siblings.remove(self.uri)
 
 		return list(siblings)
+
+
+	def create_version(self, version_label):
+
+		'''
+		method to create a new version of the resource as it currently stands
+			
+			- Note: this will create a version based on the current live instance of the resource,
+			not the local version, which might require self.update() to update.
+
+		Args:
+			version_label (str): label to be used for version
+
+		Returns:
+			(ResourceVersion): instance of ResourceVersion, also appended to self.versions
+		'''
+
+		# create version
+		version_response = self.repo.api.http_request('POST', '%s/fcr:versions' % self.uri, data=None, headers={'Slug':version_label})
+
+		# if 201, assume success
+		if version_response.status_code == 201:
+			logger.debug('version created: %s' % version_response.headers['Location'])
+
+			# retrieve version
+			version_resource = self.repo.get_resource(version_response.headers['Location'])
+
+			# instantiate ResourceVersion
+			rv = ResourceVersion(version_resource, version_response.headers['Location'], version_label)
+
+			# append to self.versions
+			setattr(self.versions, version_label, rv)
+
+
+	def get_versions(self):
+
+		'''
+		retrieves all versions of an object, and stores them at self.versions
+
+		Args:
+			None
+
+		Returns:
+			None: appends instances 
+		'''
+
+		# get all versions
+		versions_response = self.repo.api.http_request('GET', '%s/fcr:versions' % self.uri)
+
+		# parse response
+		# handle edge case for content-types not recognized by rdflib parser
+		if versions_response.headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = versions_response.headers['Content-Type']
+
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse graph	
+		versions_graph = rdflib.Graph().parse(
+			data=versions_response.content.decode('utf-8'),
+			format=parse_format)
+
+		# loop through fedora.hasVersion
+		for version_uri in versions_graph.objects(self.uri, self.rdf.prefixes.fedora.hasVersion):
+
+			# get label
+			version_label = versions_graph.value(version_uri, self.rdf.prefixes.fedora.hasVersionLabel, None).toPython()
+
+			# retrieve version
+			version_resource = self.repo.get_resource(version_uri)
+
+			# instantiate ResourceVersion
+			rv = ResourceVersion(version_resource, version_uri, version_label)
+
+			# append to self.versions
+			setattr(self.versions, version_label, rv)
+
+
+
+class ResourceVersion(Resource):
+
+	'''
+	Class to represent versions of a resource.
+
+	Versions are spawned by the Resource class method resource.create_version(), or retrieved by resource.get_versions().
+	Versions are stored in the resource instance at resource.versions
+
+	Args:
+		version_resource (Resource): retrieved and prased resource version
+		version_uri (rdflib.term.URIRef, str): uri of version
+		version_label (str): lable for version
+	'''
+
+	def __init__(self, version_resource, version_uri, version_label):
+
+		self.resource = version_resource
+		self.uri = version_uri
+		self.label = version_label
+
+
+	def revert_resource_to(self):
+		
+		'''
+		method to revert resource to this version
+		'''
+		pass
+
+
+	def delete_version(self):
+
+		'''
+		method to remove version from resource's history
+		'''
+		pass
 
 
 
