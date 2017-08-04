@@ -937,6 +937,8 @@ class Resource(object):
 			# update graph if RDFSource
 			if type(self) != NonRDFSource:
 				self._parse_graph()
+			# empty versions
+			self.versions = SimpleNamespace()
 			# cleanup
 			del(updated_self)
 		else:
@@ -1347,6 +1349,18 @@ class Resource(object):
 		return list(siblings)
 
 
+	def _affix_version(self, version_uri, version_label):
+
+		# retrieve version
+		version_resource = self.repo.get_resource(version_uri)
+
+		# instantiate ResourceVersion
+		rv = ResourceVersion(self, version_resource, version_uri, version_label)
+
+		# append to self.versions
+		setattr(self.versions, version_label, rv)
+
+
 	def create_version(self, version_label):
 
 		'''
@@ -1369,14 +1383,8 @@ class Resource(object):
 		if version_response.status_code == 201:
 			logger.debug('version created: %s' % version_response.headers['Location'])
 
-			# retrieve version
-			version_resource = self.repo.get_resource(version_response.headers['Location'])
-
-			# instantiate ResourceVersion
-			rv = ResourceVersion(version_resource, version_response.headers['Location'], version_label)
-
-			# append to self.versions
-			setattr(self.versions, version_label, rv)
+			# affix version
+			self._affix_version(version_response.headers['Location'], version_label)
 
 
 	def get_versions(self):
@@ -1417,14 +1425,8 @@ class Resource(object):
 			# get label
 			version_label = versions_graph.value(version_uri, self.rdf.prefixes.fedora.hasVersionLabel, None).toPython()
 
-			# retrieve version
-			version_resource = self.repo.get_resource(version_uri)
-
-			# instantiate ResourceVersion
-			rv = ResourceVersion(version_resource, version_uri, version_label)
-
-			# append to self.versions
-			setattr(self.versions, version_label, rv)
+			# affix version
+			self._affix_version(version_uri, version_label)
 
 
 
@@ -1442,27 +1444,62 @@ class ResourceVersion(Resource):
 		version_label (str): lable for version
 	'''
 
-	def __init__(self, version_resource, version_uri, version_label):
+	def __init__(self, current_resource, version_resource, version_uri, version_label):
 
+		self._current_resource = current_resource
 		self.resource = version_resource
 		self.uri = version_uri
 		self.label = version_label
 
 
-	def revert_resource_to(self):
+	def revert_to(self):
 		
 		'''
-		method to revert resource to this version
+		method to revert resource to this version by issuing PATCH
+
+		Args:
+			None
+
+		Returns:
+			None: sends PATCH request, and refreshes parent resource
 		'''
-		pass
+		
+		# send patch
+		response = self.resource.repo.api.http_request('PATCH', self.uri)
+
+		# if response 204
+		if response.status_code == 204:
+			logger.debug('reverting to previous version of resource, %s' % self.uri)
+
+			# refresh current resource handle
+			self._current_resource.refresh()
+
+		else:
+			raise Exception('could not revert to resource version: %s' % self.uri)
 
 
-	def delete_version(self):
+	def delete(self):
 
 		'''
 		method to remove version from resource's history
 		'''
-		pass
+		
+		# send patch
+		response = self.resource.repo.api.http_request('DELETE', self.uri)
+
+		# if response 204
+		if response.status_code == 204:
+			logger.debug('deleting previous version of resource, %s' % self.uri)
+
+			# remove from resource versions
+			delattr(self._current_resource.versions, self.label)
+
+		# if 400, likely most recent version and cannot remove
+		elif response.status_code == 400:
+			raise Exception('code 400, likely most recent resource version which cannot be removed')
+
+		else:
+			raise Exception('could not delete resource version: %s' % self.uri)
 
 
 
