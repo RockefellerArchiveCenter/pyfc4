@@ -83,7 +83,7 @@ class Repository(object):
 		self.txns = {}
 
 
-	def parse_uri(self, uri):
+	def parse_uri(self, uri=None):
 	
 		'''
 		parses and cleans up possible uri inputs, return instance of rdflib.term.URIRef
@@ -110,15 +110,21 @@ class Repository(object):
 			else:
 				return rdflib.term.URIRef(uri)
 
-		# already cleaned and URIRef type
-		else:
+		# already rdflib.term.URIRef
+		elif type(uri) == rdflib.term.URIRef:
 			return uri
+
+		# unknown input
+		else:
+			raise TypeError('invalid URI input')
 
 
 	def create_resource(self, resource_type=None, uri=None,):
 
 		'''
 		Convenience method for creating a new resource
+
+		Note: A Resource is instantiated, but is not yet created.  Still requires resource.create().
 
 		Args:
 			uri (rdflib.term.URIRef, str): uri of resource to create
@@ -128,10 +134,10 @@ class Repository(object):
 			(NonRDFSource (Binary), BasicContainer, DirectContainer, IndirectContainer): instance of appropriate type
 		'''
 
-		if resource_type:
+		if resource_type in [NonRDFSource, Binary, BasicContainer, DirectContainer, IndirectContainer]:
 			return resource_type(self, uri)
 		else:
-			raise Exception("please provide class of resource type")
+			raise TypeError("expecting Resource type, such as BasicContainer or NonRDFSource")
 
 
 	def get_resource(self, uri, response_format=None):
@@ -185,7 +191,7 @@ class Repository(object):
 				status_code=get_response.status_code)
 
 		else:
-			raise Exception('error retrieving resource uri %s' % uri)
+			raise Exception('HTTP %s, error retrieving resource uri %s' % (head_response.status_code, uri))
 
 
 	def start_txn(self, txn_name=None):
@@ -273,7 +279,7 @@ class Repository(object):
 			return False
 
 		else:
-			raise Exception('could not retrieve transaction')
+			raise Exception('HTTP %s, could not retrieve transaction' % txn_response.status_code)
 
 
 
@@ -345,7 +351,7 @@ class Transaction(Repository):
 			return False
 
 		else:
-			raise Exception('could not continue transaction')
+			raise Exception('HTTP %s, could not continue transaction' % txn_response.status_code)
 
 
 	def _close(self, close_type):
@@ -379,7 +385,7 @@ class Transaction(Repository):
 			return False
 
 		else:
-			raise Exception('could not commit transaction')
+			raise Exception('HTTP %s, could not commit transaction' % txn_response.status_code)
 
 
 	def commit(self):
@@ -786,11 +792,11 @@ class Resource(object):
 
 		# 404, assumed POST, target location does not exist
 		elif response.status_code == 404:
-			raise Exception('for this POST request, target location does not exist')
+			raise Exception('HTTP 404, for this POST request target location does not exist')
 
 		# 409, conflict, resource likely exists
 		elif response.status_code == 409:
-			raise Exception('resource already exists')
+			raise Exception('HTTP 409, resource already exists')
 		
 		# 410, tombstone present
 		elif response.status_code == 410:
@@ -800,17 +806,17 @@ class Resource(object):
 					logger.debug('tombstone removed, retrying create')
 					self.create()
 				else:
-					raise Exception('Could not remove tombstone for %s' % self.uri)
+					raise Exception('HTTP %s, Could not remove tombstone for %s' % (response.status_code, self.uri))
 			else:
 				raise Exception('tombstone for %s detected, aborting' % self.uri)
 
 		# 415, unsupported media type
 		elif response.status_code == 415:
-			raise Exception('unsupported media type')
+			raise Exception('HTTP 415, unsupported media type')
 
 		# unknown status code
 		else:
-			raise Exception('unknown error creating, status code: %s' % response.status_code)
+			raise Exception('HTTP %s, unknown error creating resource' % response.status_code)
 
 		# if all goes well, return True
 		return True
@@ -861,7 +867,7 @@ class Resource(object):
 				tombstone_response = self.repo.api.http_request('DELETE', "%s/fcr:tombstone" % self.uri)
 			return destination_uri
 		else:
-			raise Exception('could not move resource %s to %s' % (self.uri, destination_uri))
+			raise Exception('HTTP %s, could not move resource %s to %s' % (response.status_code, self.uri, destination_uri))
 
 
 	def copy(self, destination):
@@ -886,7 +892,7 @@ class Resource(object):
 		if response.status_code == 201:
 			return destination_uri
 		else:
-			raise Exception('could not move resource %s to %s' % (self.uri, destination_uri))
+			raise Exception('HTTP %s, could not move resource %s to %s' % (response.status_code, self.uri, destination_uri))
 
 
 	def delete(self, remove_tombstone=True):
@@ -930,7 +936,7 @@ class Resource(object):
 
 		# if resource type of updated_self != self, raise exception
 		if type(updated_self) != type(self):
-			raise Exception('Instantiated %s, but repository reports this resource is %s, raising exception' % (type(updated_self), type(self)) )
+			raise Exception('Instantiated %s, but repository reports this resource is %s' % (type(updated_self), type(self)) )
 
 		if updated_self:
 			# update attributes
@@ -1461,7 +1467,7 @@ class ResourceVersion(Resource):
 			self._current_resource.refresh()
 
 		else:
-			raise Exception('could not revert to resource version: %s' % self.uri)
+			raise Exception('HTTP %s, could not revert to resource version, %s' % (response.status_code, self.uri))
 
 
 	def delete(self):
@@ -1482,10 +1488,10 @@ class ResourceVersion(Resource):
 
 		# if 400, likely most recent version and cannot remove
 		elif response.status_code == 400:
-			raise Exception('code 400, likely most recent resource version which cannot be removed')
+			raise Exception('HTTP 400, likely most recent resource version which cannot be removed')
 
 		else:
-			raise Exception('could not delete resource version: %s' % self.uri)
+			raise Exception('HTTP %s, could not delete resource version: %s' % (response.status_code, self.uri))
 
 
 
