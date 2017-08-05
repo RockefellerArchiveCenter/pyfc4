@@ -587,7 +587,7 @@ class TestVersions(object):
 		# assert cannot delete v2, as most recent
 		with pytest.raises(Exception) as excinfo:
 			foo.versions.v2.delete()
-		assert 'code 400' in str(excinfo.value)
+		assert 'HTTP 400' in str(excinfo.value)
 
 		# but delete v1
 		foo.versions.v1.delete()
