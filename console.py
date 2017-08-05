@@ -101,19 +101,19 @@ def benchmark_create_basic_container(number, resource_type):
 	#########################################
 	# use pyfc4, refreshing resource
 	#########################################
-	# logger.debug('using pyfc4...')
-	# # start timer
-	# stime = time.time()
-	# for x in range(0, number):
+	logger.debug('using pyfc4...')
+	# start timer
+	stime = time.time()
+	for x in range(0, number):
 
-	# 	# create resource with minted uri
-	# 	r = BasicContainer(rf)
-	# 	'''
-	# 	it must be slower, as it parses refreshed RDF
-	# 	but how much slower?
-	# 	'''
-	# 	r.create()
-	# report['pyfc4'] = time.time()-stime
+		# create resource with minted uri
+		r = BasicContainer(rf)
+		'''
+		it must be slower, as it parses refreshed RDF
+		but how much slower?
+		'''
+		r.create()
+	report['pyfc4_refresh'] = time.time()-stime
 
 
 	#########################################
@@ -131,20 +131,20 @@ def benchmark_create_basic_container(number, resource_type):
 		but how much slower?
 		'''
 		r.create(refresh=False)
-	report['pyfc4'] = time.time()-stime
+	report['pyfc4_no_refresh'] = time.time()-stime
 
 
 	#########################################
 	# raw API
 	#########################################
-	# logger.debug('using raw API...')
-	# # start timer
-	# stime = time.time()
-	# # send POST and create resource
-	# for x in range(0, number):
-	# 	r = requests.post(rf.root, data=None, headers=None)
+	logger.debug('using raw API...')
+	# start timer
+	stime = time.time()
+	# send POST and create resource
+	for x in range(0, number):
+		r = requests.post(rf.root, data=None, headers=None)
 
-	# report['raw'] = time.time()-stime
+	report['raw'] = time.time()-stime
 
 
 	#########################################

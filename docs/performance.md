@@ -12,7 +12,7 @@ However, to mitigate this, one can run methods like `resource.create` and `resou
 
 ![selection_075](https://user-images.githubusercontent.com/1753087/28998479-36c0b32a-79fa-11e7-8023-45435317c7c6.png)
 
-And often, refreshing a resource's information is unnecessary when building or updating them programatically as, by that point, you're likely fairly confident the results of actions.  That being true, even without running `resource.refresh`, the response headers from creation or update an object will confirm if the operation was successful.
+And often, refreshing a resource's information is unnecessary when building or updating them programatically, as, by that point, you're likely fairly confident the results of actions.  That being true, even without running `resource.refresh`, the response headers from creation or update an object will confirm if the operation was successful.
 
 ### Sessions / Caching
 
