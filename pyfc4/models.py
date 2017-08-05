@@ -19,40 +19,6 @@ logger.setLevel(logging.DEBUG)
 
 
 
-def parse_rdf_payload(data, headers):
-	
-	'''
-	small function to parse RDF payloads from various repository endpoints
-
-	Args:
-		data (response.data): data from requests response
-		headers (response.headers): headers from requests response
-
-	Returns:
-		(rdflib.Graph): parsed graph
-	'''
-
-	# handle edge case for content-types not recognized by rdflib parser
-	if headers['Content-Type'].startswith('text/plain'):
-		logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
-		parse_format = 'application/n-triples'
-	else:
-		parse_format = headers['Content-Type']
-
-	# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
-	if ';charset' in parse_format:
-		parse_format = parse_format.split(';')[0]
-	
-	# parse graph	
-	graph = rdflib.Graph().parse(
-		data=data.decode('utf-8'),
-		format=parse_format)
-
-	# return graph
-	return graph
-
-
-
 class Repository(object):
 	
 	'''
@@ -574,6 +540,39 @@ class API(object):
 			return False
 
 
+	def parse_rdf_payload(self, data, headers):
+	
+		'''
+		small function to parse RDF payloads from various repository endpoints
+
+		Args:
+			data (response.data): data from requests response
+			headers (response.headers): headers from requests response
+
+		Returns:
+			(rdflib.Graph): parsed graph
+		'''
+
+		# handle edge case for content-types not recognized by rdflib parser
+		if headers['Content-Type'].startswith('text/plain'):
+			logger.debug('text/plain Content-Type detected, using application/n-triples for parser')
+			parse_format = 'application/n-triples'
+		else:
+			parse_format = headers['Content-Type']
+
+		# clean parse format for rdf parser (see: https://www.w3.org/2008/01/rdf-media-types)
+		if ';charset' in parse_format:
+			parse_format = parse_format.split(';')[0]
+		
+		# parse graph	
+		graph = rdflib.Graph().parse(
+			data=data.decode('utf-8'),
+			format=parse_format)
+
+		# return graph
+		return graph
+
+
 
 class SparqlUpdate(object):
 
@@ -1029,7 +1028,7 @@ class Resource(object):
 
 		# if resource exists, parse self.rdf.data
 		if self.exists:
-			self.rdf.graph = parse_rdf_payload(self.rdf.data, self.headers)
+			self.rdf.graph = self.repo.api.parse_rdf_payload(self.rdf.data, self.headers)
 
 		# else, create empty graph
 		else:
@@ -1414,7 +1413,7 @@ class Resource(object):
 		versions_response = self.repo.api.http_request('GET', '%s/fcr:versions' % self.uri)
 
 		# parse response
-		versions_graph = parse_rdf_payload(versions_response.content, versions_response.headers)
+		versions_graph = self.repo.api.parse_rdf_payload(versions_response.content, versions_response.headers)
 
 		# loop through fedora.hasVersion
 		for version_uri in versions_graph.objects(self.uri, self.rdf.prefixes.fedora.hasVersion):
@@ -1690,7 +1689,7 @@ class NonRDFSource(Resource):
 		response = self.repo.api.http_request('GET', '%s/fcr:fixity' % self.uri)
 
 		# parse
-		fixity_graph = parse_rdf_payload(response.content, response.headers)
+		fixity_graph = self.repo.api.parse_rdf_payload(response.content, response.headers)
 
 		# determine verdict		
 		for outcome in fixity_graph.objects(None, self.rdf.prefixes.premis.hasEventOutcome):
