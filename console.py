@@ -81,3 +81,79 @@ def delete_demo_resources():
 		except:
 			logger.debug('could not delete %s' % resource)
 
+
+
+################################################
+# Benchmarking
+################################################
+
+def benchmark_create_basic_container(number, resource_type):
+
+	# expects number to create, and actual class 
+
+	logger.debug("creating %s BasicContainers with pyfc4 and raw API" % number)
+	report = {}
+	
+	# test within a transaction
+	rf = repo.start_txn('rf')
+
+
+	#########################################
+	# use pyfc4, refreshing resource
+	#########################################
+	# logger.debug('using pyfc4...')
+	# # start timer
+	# stime = time.time()
+	# for x in range(0, number):
+
+	# 	# create resource with minted uri
+	# 	r = BasicContainer(rf)
+	# 	'''
+	# 	it must be slower, as it parses refreshed RDF
+	# 	but how much slower?
+	# 	'''
+	# 	r.create()
+	# report['pyfc4'] = time.time()-stime
+
+
+	#########################################
+	# use pyfc4, no refresh
+	#########################################
+	logger.debug('using pyfc4...')
+	# start timer
+	stime = time.time()
+	for x in range(0, number):
+
+		# create resource with minted uri
+		r = BasicContainer(rf)
+		'''
+		it must be slower, as it parses refreshed RDF
+		but how much slower?
+		'''
+		r.create(refresh=False)
+	report['pyfc4'] = time.time()-stime
+
+
+	#########################################
+	# raw API
+	#########################################
+	# logger.debug('using raw API...')
+	# # start timer
+	# stime = time.time()
+	# # send POST and create resource
+	# for x in range(0, number):
+	# 	r = requests.post(rf.root, data=None, headers=None)
+
+	# report['raw'] = time.time()-stime
+
+
+	#########################################
+	# report
+	#########################################
+	# rollback transaction
+	rf.rollback()
+	# report
+	logger.debug(report)
+
+
+

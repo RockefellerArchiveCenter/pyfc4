@@ -119,7 +119,7 @@ class Repository(object):
 			raise TypeError('invalid URI input')
 
 
-	def create_resource(self, resource_type=None, uri=None,):
+	def create_resource(self, resource_type=None, uri=None):
 
 		'''
 		Convenience method for creating a new resource
@@ -729,7 +729,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, refresh=True):
 
 		'''
 		Primary method to create resources.
@@ -770,10 +770,10 @@ class Resource(object):
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers, stream=stream)
-			return self._handle_create(response, ignore_tombstone)
+			return self._handle_create(response, ignore_tombstone, refresh)
 			
 
-	def _handle_create(self, response, ignore_tombstone):
+	def _handle_create(self, response, ignore_tombstone, refresh):
 
 		'''
 		Handles response from self.create()
@@ -788,7 +788,8 @@ class Resource(object):
 			# if not specifying uri, capture from response and append to object
 			self.uri = self.repo.parse_uri(response.text)
 			# creation successful, update resource
-			self.refresh()
+			if refresh:
+				self.refresh()
 
 		# 404, assumed POST, target location does not exist
 		elif response.status_code == 404:
@@ -1101,9 +1102,6 @@ class Resource(object):
 		self.rdf.namespace_manager.bind(ns_prefix, ns_uri, override=False)
 
 
-	
-
-
 	def _empty_resource_attributes(self):
 
 		'''
@@ -1227,7 +1225,7 @@ class Resource(object):
 
 
 	# update RDF, and for NonRDFSource, binaries
-	def update(self, sparql_query_only=False):
+	def update(self, sparql_query_only=False, refresh=True):
 
 		'''
 		Method to update resources in repository.  Firing this method computes the difference in the local modified graph and the original one, 
@@ -1265,7 +1263,8 @@ class Resource(object):
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
-			self.refresh()
+			if refresh:
+				self.refresh()
 			return True
 
 
