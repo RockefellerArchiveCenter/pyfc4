@@ -28,8 +28,11 @@ class Repository(object):
 		root (str): Full URL of repository REST endpoint (e.g. http://localhost:8080/rest)
 		username (str): username for authorization and roles
 		password (str): password authorziation and roles
-		context (dict): dictionary of namespace prefixes and namespace URIs that propagate to Resources 
+		context (dict): dictionary of namespace prefixes and namespace URIs that propagate
+			to Resources 
 		default_serialization (str): mimetype of default Accept and Content-Type headers
+		default_auto_refresh (bool): if False, resource create/update, and graph modifications
+			will not retrieve or parse updates automatically.  Dramatically improves performance.
 
 	Attributes:
 		context (dict): Default dictionary of namespace prefixes and namespace URIs
@@ -59,6 +62,7 @@ class Repository(object):
 			password,
 			context = None,
 			default_serialization = 'application/rdf+xml',
+			default_auto_refresh=True
 		):
 
 		# handle root path
@@ -70,6 +74,9 @@ class Repository(object):
 
 		# serialization
 		self.default_serialization = default_serialization
+
+		# default, general auto_refresh
+		self.default_auto_refresh = default_auto_refresh
 
 		# API facade
 		self.api = API(self)
@@ -762,7 +769,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, refresh=True):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, auto_refresh=None):
 
 		'''
 		Primary method to create resources.
@@ -803,10 +810,10 @@ class Resource(object):
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers, stream=stream)
-			return self._handle_create(response, ignore_tombstone, refresh)
+			return self._handle_create(response, ignore_tombstone, auto_refresh)
 			
 
-	def _handle_create(self, response, ignore_tombstone, refresh):
+	def _handle_create(self, response, ignore_tombstone, auto_refresh):
 
 		'''
 		Handles response from self.create()
@@ -820,9 +827,12 @@ class Resource(object):
 		if response.status_code == 201:
 			# if not specifying uri, capture from response and append to object
 			self.uri = self.repo.parse_uri(response.text)
-			# creation successful, update resource
-			if refresh:
+			# creation successful
+			if auto_refresh:
 				self.refresh()
+			elif auto_refresh == None:
+				if self.repo.default_auto_refresh:
+					self.refresh()
 
 		# 404, assumed POST, target location does not exist
 		elif response.status_code == 404:
@@ -1195,7 +1205,7 @@ class Resource(object):
 			return object_input
 
 
-	def add_triple(self, p, o, refresh_quick_triples=True):
+	def add_triple(self, p, o, auto_refresh=None):
 
 		'''
 		add triple by providing p,o, assumes s = subject
@@ -1203,7 +1213,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
+			auto_refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: adds triple to self.rdf.graph
@@ -1211,12 +1221,11 @@ class Resource(object):
 
 		self.rdf.graph.add((self.uri, p, self._handle_object(o)))
 
-		# refresh self.rdf.triples
-		if refresh_quick_triples:
-			self.parse_object_like_triples()
+		# determine if triples refreshed
+		self._handle_triple_refresh(auto_refresh)
 
 
-	def set_triple(self, p, o, refresh_quick_triples=True):
+	def set_triple(self, p, o, auto_refresh=True):
 		
 		'''
 		Assuming the predicate or object matches a single triple, sets the other for that triple.
@@ -1224,7 +1233,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
+			auto_refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: modifies pre-existing triple in self.rdf.graph
@@ -1232,12 +1241,11 @@ class Resource(object):
 		
 		self.rdf.graph.set((self.uri, p, self._handle_object(o)))
 
-		# refresh self.rdf.triples
-		if refresh_quick_triples:
-			self.parse_object_like_triples()
+		# determine if triples refreshed
+		self._handle_triple_refresh(auto_refresh)
 
 
-	def remove_triple(self, p, o, refresh_quick_triples=True):
+	def remove_triple(self, p, o, auto_refresh=True):
 
 		'''
 		remove triple by supplying p,o
@@ -1245,7 +1253,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
+			auto_refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: removes triple from self.rdf.graph
@@ -1253,13 +1261,27 @@ class Resource(object):
 
 		self.rdf.graph.remove((self.uri, p, self._handle_object(o)))
 
-		# refresh self.rdf.triples
-		if refresh_quick_triples:
+		# determine if triples refreshed
+		self._handle_triple_refresh(auto_refresh)
+
+
+	def _handle_triple_refresh(self, auto_refresh):
+
+		'''
+		method to refresh self.rdf.triples if auto_refresh or defaults set to True
+		'''
+
+		# if auto_refresh set, and True, refresh
+		if auto_refresh:
 			self.parse_object_like_triples()
+		# else, if auto_refresh is not set (None), check repository instance default
+		elif auto_refresh == None:
+			if self.repo.default_auto_refresh:
+				self.parse_object_like_triples()
 
 
 	# update RDF, and for NonRDFSource, binaries
-	def update(self, sparql_query_only=False, refresh=True):
+	def update(self, sparql_query_only=False, auto_refresh=None):
 
 		'''
 		Method to update resources in repository.  Firing this method computes the difference in the local modified graph and the original one, 
@@ -1297,8 +1319,11 @@ class Resource(object):
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
-			if refresh:
+			if auto_refresh:
 				self.refresh()
+			elif auto_refresh == None:
+				if self.repo.default_auto_refresh:
+					self.refresh()
 			return True
 
 
