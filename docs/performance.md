@@ -8,7 +8,7 @@ Additionally, there are some flags and options for using pyfc4 in ways to approa
 
 One way in which pyfc4 can be considerably slower, is **creating** or **updating** a number of objects.  This is because each time pyfc4 creates or updates a resource, it issues a follow-up `GET` request for the newly created, or modified, resource information.
 
-However, to mitigate this, one can run methods like `resource.create` and `resource.update` with an optional flag `refresh=False` that will prevent pyfc4 from running `resource.refresh` that updates the resource metadata.  This can dramatically improve performance:
+However, to mitigate this, one can run methods like `resource.create` and `resource.update` with an optional flag `auto_refresh=False` that will prevent pyfc4 from running `resource.refresh` that updates the resource metadata.  This can dramatically improve performance:
 
 ![selection_075](https://user-images.githubusercontent.com/1753087/28998479-36c0b32a-79fa-11e7-8023-45435317c7c6.png)
 
@@ -38,7 +38,7 @@ However, no good deed goes unpunished.  Because this object-like requires loopin
 
 ![selection_076](https://user-images.githubusercontent.com/1753087/29002957-bc3cecfe-7a7b-11e7-9ad3-8e8a3fa6aee9.png)
 
-Similar to optionally refreshing a resource after creation or update, you can pass the optional flag `refresh_quick_triples=False` for `self.add_triple`, `self.set_triple`, or `self.remove_triple` to prevent this follow-up graph parsing.
+Similar to optionally refreshing a resource after creation or update, you can pass the optional flag `auto_refresh=False` for `self.add_triple`, `self.set_triple`, or `self.remove_triple` to prevent this follow-up graph parsing.
 
 ### Sessions / Caching
 
