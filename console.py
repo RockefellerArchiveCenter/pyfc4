@@ -130,7 +130,7 @@ def bench_create_basic_container(number, resource_type):
 		it must be slower, as it parses refreshed RDF
 		but how much slower?
 		'''
-		r.create(refresh=False)
+		r.create(auto_refresh=False)
 	report['pyfc4_no_refresh'] = time.time()-stime
 
 
@@ -174,7 +174,7 @@ def bench_refresh_triples(number):
 	# start timer
 	stime = time.time()
 	for x in range(0, number):
-		r.add_triple(r.rdf.prefixes.foaf.knows, x, refresh_quick_triples=False)
+		r.add_triple(r.rdf.prefixes.foaf.knows, x, auto_refresh=False)
 	report['no_update'] = time.time()-stime
 
 
