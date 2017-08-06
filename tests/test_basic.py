@@ -1,5 +1,8 @@
+# pyfc4 - tests
 
 from pyfc4.models import *
+
+import localsettings
 
 import datetime
 import inspect
@@ -19,7 +22,7 @@ logger.setLevel(logging.DEBUG)
 testing_container_uri = 'testing'
 
 # instantiate repository
-repo = Repository('http://localhost:8080/rest','ghukill','password', context={'foo':'http://foo.com'})
+repo = Repository(localsettings.REPO_ROOT,localsettings.REPO_USERNAME,localsettings.REPO_PASSWORD, context={'foo':'http://foo.com'})
 
 
 
@@ -195,17 +198,17 @@ class TestBasicCRUDPUT(object):
 
 		# RDF XML
 		foo = repo.get_resource('%s/foo' % testing_container_uri, response_format="application/rdf+xml")
-		assert foo.headers['Content-Type'] == 'application/rdf+xml'
+		assert foo.headers['Content-Type'].startswith('application/rdf+xml')
 
 		# Turtle
 		foo = repo.get_resource('%s/foo' % testing_container_uri, response_format="text/turtle")
-		assert foo.headers['Content-Type'] == 'text/turtle'
+		assert foo.headers['Content-Type'].startswith('text/turtle')
 
 		# with raw API
 		response = repo.api.http_request('GET', foo.uri, data=None, headers={'Accept':'text/turtle'})
-		assert foo.headers['Content-Type'] == 'text/turtle'
+		assert foo.headers['Content-Type'].startswith('text/turtle')
 		response = repo.api.http_request('GET', foo.uri, data=None, headers=None, response_format='text/turtle')
-		assert foo.headers['Content-Type'] == 'text/turtle'
+		assert foo.headers['Content-Type'].startswith('text/turtle')
 
 
 
@@ -216,7 +219,7 @@ class TestURIParsing(object):
 	'''
 
 	def test_full_uri_string(self):
-		foo = repo.get_resource('http://localhost:8080/rest/%s/foo' % testing_container_uri)
+		foo = repo.get_resource('%s/%s/foo' % (localsettings.REPO_ROOT.rstrip('/'), testing_container_uri))
 		assert foo.exists
 
 
@@ -226,7 +229,7 @@ class TestURIParsing(object):
 
 
 	def test_URIRef_uri(self):
-		foo = repo.get_resource(rdflib.term.URIRef('http://localhost:8080/rest/%s/foo' % testing_container_uri))
+		foo = repo.get_resource(rdflib.term.URIRef('%s/%s/foo' % (localsettings.REPO_ROOT.rstrip('/'), testing_container_uri)))
 		assert foo.exists
 
 
