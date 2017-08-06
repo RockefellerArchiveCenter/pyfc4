@@ -762,7 +762,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, refresh=True):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, auto_refresh=True):
 
 		'''
 		Primary method to create resources.
@@ -803,10 +803,10 @@ class Resource(object):
 			
 			# fire creation request
 			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers, stream=stream)
-			return self._handle_create(response, ignore_tombstone, refresh)
+			return self._handle_create(response, ignore_tombstone, auto_refresh)
 			
 
-	def _handle_create(self, response, ignore_tombstone, refresh):
+	def _handle_create(self, response, ignore_tombstone, auto_refresh):
 
 		'''
 		Handles response from self.create()
@@ -821,7 +821,7 @@ class Resource(object):
 			# if not specifying uri, capture from response and append to object
 			self.uri = self.repo.parse_uri(response.text)
 			# creation successful, update resource
-			if refresh:
+			if auto_refresh:
 				self.refresh()
 
 		# 404, assumed POST, target location does not exist
@@ -1195,7 +1195,7 @@ class Resource(object):
 			return object_input
 
 
-	def add_triple(self, p, o, refresh=True):
+	def add_triple(self, p, o, auto_refresh=True):
 
 		'''
 		add triple by providing p,o, assumes s = subject
@@ -1203,7 +1203,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh (bool): whether or not to update object-like self.rdf.triples
+			auto_refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: adds triple to self.rdf.graph
@@ -1211,12 +1211,12 @@ class Resource(object):
 
 		self.rdf.graph.add((self.uri, p, self._handle_object(o)))
 
-		# refresh self.rdf.triples
-		if refresh:
+		# auto_refresh self.rdf.triples
+		if auto_refresh:
 			self.parse_object_like_triples()
 
 
-	def set_triple(self, p, o, refresh=True):
+	def set_triple(self, p, o, auto_refresh=True):
 		
 		'''
 		Assuming the predicate or object matches a single triple, sets the other for that triple.
@@ -1224,7 +1224,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh (bool): whether or not to update object-like self.rdf.triples
+			auto_refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: modifies pre-existing triple in self.rdf.graph
@@ -1232,12 +1232,12 @@ class Resource(object):
 		
 		self.rdf.graph.set((self.uri, p, self._handle_object(o)))
 
-		# refresh self.rdf.triples
-		if refresh:
+		# auto_refresh self.rdf.triples
+		if auto_refresh:
 			self.parse_object_like_triples()
 
 
-	def remove_triple(self, p, o, refresh=True):
+	def remove_triple(self, p, o, auto_refresh=True):
 
 		'''
 		remove triple by supplying p,o
@@ -1245,7 +1245,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh (bool): whether or not to update object-like self.rdf.triples
+			auto_refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: removes triple from self.rdf.graph
@@ -1253,13 +1253,13 @@ class Resource(object):
 
 		self.rdf.graph.remove((self.uri, p, self._handle_object(o)))
 
-		# refresh self.rdf.triples
-		if refresh:
+		# auto_refresh self.rdf.triples
+		if auto_refresh:
 			self.parse_object_like_triples()
 
 
 	# update RDF, and for NonRDFSource, binaries
-	def update(self, sparql_query_only=False, refresh=True):
+	def update(self, sparql_query_only=False, auto_refresh=True):
 
 		'''
 		Method to update resources in repository.  Firing this method computes the difference in the local modified graph and the original one, 
@@ -1297,7 +1297,7 @@ class Resource(object):
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
-			if refresh:
+			if auto_refresh:
 				self.refresh()
 			return True
 
