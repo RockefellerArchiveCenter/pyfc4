@@ -1195,7 +1195,7 @@ class Resource(object):
 			return object_input
 
 
-	def add_triple(self, p, o, refresh_quick_triples=True):
+	def add_triple(self, p, o, refresh=True):
 
 		'''
 		add triple by providing p,o, assumes s = subject
@@ -1203,7 +1203,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
+			refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: adds triple to self.rdf.graph
@@ -1212,11 +1212,11 @@ class Resource(object):
 		self.rdf.graph.add((self.uri, p, self._handle_object(o)))
 
 		# refresh self.rdf.triples
-		if refresh_quick_triples:
+		if refresh:
 			self.parse_object_like_triples()
 
 
-	def set_triple(self, p, o, refresh_quick_triples=True):
+	def set_triple(self, p, o, refresh=True):
 		
 		'''
 		Assuming the predicate or object matches a single triple, sets the other for that triple.
@@ -1224,7 +1224,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
+			refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: modifies pre-existing triple in self.rdf.graph
@@ -1233,11 +1233,11 @@ class Resource(object):
 		self.rdf.graph.set((self.uri, p, self._handle_object(o)))
 
 		# refresh self.rdf.triples
-		if refresh_quick_triples:
+		if refresh:
 			self.parse_object_like_triples()
 
 
-	def remove_triple(self, p, o, refresh_quick_triples=True):
+	def remove_triple(self, p, o, refresh=True):
 
 		'''
 		remove triple by supplying p,o
@@ -1245,7 +1245,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
-			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
+			refresh (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: removes triple from self.rdf.graph
@@ -1254,7 +1254,7 @@ class Resource(object):
 		self.rdf.graph.remove((self.uri, p, self._handle_object(o)))
 
 		# refresh self.rdf.triples
-		if refresh_quick_triples:
+		if refresh:
 			self.parse_object_like_triples()
 
 
