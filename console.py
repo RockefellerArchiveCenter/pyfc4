@@ -10,7 +10,7 @@ logger.setLevel(logging.DEBUG)
 
 logger.debug('''
 #######################################################################
-pyfc4 convenience console.  All our triples are belong to you.
+pyfc4 debug/convenience console.  All our triples are belong to you.
 #######################################################################\
 ''')
 
@@ -87,7 +87,7 @@ def delete_demo_resources():
 # Benchmarking
 ################################################
 
-def benchmark_create_basic_container(number, resource_type):
+def bench_create_basic_container(number, resource_type):
 
 	# expects number to create, and actual class 
 
@@ -95,7 +95,7 @@ def benchmark_create_basic_container(number, resource_type):
 	report = {}
 	
 	# test within a transaction
-	rf = repo.start_txn('rf')
+	txn = repo.start_txn('txn')
 
 
 	#########################################
@@ -107,7 +107,7 @@ def benchmark_create_basic_container(number, resource_type):
 	for x in range(0, number):
 
 		# create resource with minted uri
-		r = BasicContainer(rf)
+		r = BasicContainer(txn)
 		'''
 		it must be slower, as it parses refreshed RDF
 		but how much slower?
@@ -125,7 +125,7 @@ def benchmark_create_basic_container(number, resource_type):
 	for x in range(0, number):
 
 		# create resource with minted uri
-		r = BasicContainer(rf)
+		r = BasicContainer(txn)
 		'''
 		it must be slower, as it parses refreshed RDF
 		but how much slower?
@@ -142,7 +142,7 @@ def benchmark_create_basic_container(number, resource_type):
 	stime = time.time()
 	# send POST and create resource
 	for x in range(0, number):
-		r = requests.post(rf.root, data=None, headers=None)
+		r = requests.post(txn.root, data=None, headers=None)
 
 	report['raw'] = time.time()-stime
 
@@ -151,9 +151,54 @@ def benchmark_create_basic_container(number, resource_type):
 	# report
 	#########################################
 	# rollback transaction
-	rf.rollback()
+	txn.rollback()
 	# report
 	logger.debug(report)
+
+
+
+def bench_refresh_triples(number):
+
+	# expects number of triples to modify
+	report = {}
+	
+	# test within a transaction
+	txn = repo.start_txn('txn')
+
+	#########################################
+	# do not update quick triples
+	#########################################
+	logger.debug('not updating self.rdf.triples')
+	r = BasicContainer(txn)
+	r.create()
+	# start timer
+	stime = time.time()
+	for x in range(0, number):
+		r.add_triple(r.rdf.prefixes.foaf.knows, x, refresh_quick_triples=False)
+	report['no_update'] = time.time()-stime
+
+
+	#########################################
+	# use pyfc4, no refresh
+	#########################################
+	logger.debug('not updating self.rdf.triples')
+	r = BasicContainer(txn)
+	r.create()
+	# start timer
+	stime = time.time()
+	for x in range(0, number):
+		r.add_triple(r.rdf.prefixes.foaf.knows, x)
+	report['update'] = time.time()-stime
+
+
+	#########################################
+	# report
+	#########################################
+	# rollback transaction
+	txn.rollback()
+	# report
+	logger.debug(report)
+	return report
 
 
 
