@@ -19,7 +19,7 @@ logger.setLevel(logging.DEBUG)
 testing_container_uri = 'testing'
 
 # instantiate repository
-repo = Repository('http://localhost:8080/rest','ghukill','password', context={'foo':'http://foo.com'})
+repo = Repository('http://localhost:8080/fcrepo/rest','fedoraAdmin','secret3', context={'foo':'http://foo.com'})
 
 
 

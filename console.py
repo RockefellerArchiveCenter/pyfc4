@@ -15,7 +15,7 @@ pyfc4 debug/convenience console.  All our triples are belong to you.
 ''')
 
 # instantiate repository
-repo = Repository('http://localhost:8080/rest','username','password', context={'foo':'http://foo.com/ontology/','bar':'http://bar.org#'})
+repo = Repository('http://localhost:8080/fcrepo/rest','fedoraAdmin','secret3', context={'foo':'http://foo.com/ontology/','bar':'http://bar.org#'})
 
 '''
 The following functions are created entirely for convenience/testing purposes.

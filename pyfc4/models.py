@@ -502,7 +502,7 @@ class API(object):
 
 		# manually prepare request
 		session = requests.Session()
-		request = requests.Request(verb, uri, data=data, headers=headers, files=files)
+		request = requests.Request(verb, uri, auth=(self.repo.username, self.repo.password), data=data, headers=headers, files=files)
 		prepped_request = session.prepare_request(request)
 		response = session.send(prepped_request,
 			stream=stream,
