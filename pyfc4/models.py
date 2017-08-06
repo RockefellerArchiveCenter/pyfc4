@@ -1047,6 +1047,23 @@ class Resource(object):
 		# pin old graph to resource, create copy graph for modifications
 		self.rdf._orig_graph = copy.deepcopy(self.rdf.graph)
 
+		# parse triples for object-like access
+		self.parse_object_like_triples()
+
+
+	def parse_object_like_triples(self):
+
+		'''
+		method to parse triples from self.rdf.graph for object-like 
+		access
+
+		Args:
+			None
+
+		Returns:
+			None: sets self.rdf.triples
+		'''
+
 		# parse triples as object-like attributes in self.rdf.triples
 		self.rdf.triples = SimpleNamespace() # prepare triples
 		for s,p,o in self.rdf.graph:
@@ -1178,7 +1195,7 @@ class Resource(object):
 			return object_input
 
 
-	def add_triple(self, p, o):
+	def add_triple(self, p, o, refresh_quick_triples=True):
 
 		'''
 		add triple by providing p,o, assumes s = subject
@@ -1186,6 +1203,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
+			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: adds triple to self.rdf.graph
@@ -1193,8 +1211,12 @@ class Resource(object):
 
 		self.rdf.graph.add((self.uri, p, self._handle_object(o)))
 
+		# refresh self.rdf.triples
+		if refresh_quick_triples:
+			self.parse_object_like_triples()
 
-	def set_triple(self, p, o):
+
+	def set_triple(self, p, o, refresh_quick_triples=True):
 		
 		'''
 		Assuming the predicate or object matches a single triple, sets the other for that triple.
@@ -1202,6 +1224,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
+			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: modifies pre-existing triple in self.rdf.graph
@@ -1209,8 +1232,12 @@ class Resource(object):
 		
 		self.rdf.graph.set((self.uri, p, self._handle_object(o)))
 
+		# refresh self.rdf.triples
+		if refresh_quick_triples:
+			self.parse_object_like_triples()
 
-	def remove_triple(self, p, o):
+
+	def remove_triple(self, p, o, refresh_quick_triples=True):
 
 		'''
 		remove triple by supplying p,o
@@ -1218,6 +1245,7 @@ class Resource(object):
 		Args:
 			p (rdflib.term.URIRef): predicate
 			o (): object
+			refresh_quick_triples (bool): whether or not to update object-like self.rdf.triples
 
 		Returns:
 			None: removes triple from self.rdf.graph
@@ -1225,22 +1253,9 @@ class Resource(object):
 
 		self.rdf.graph.remove((self.uri, p, self._handle_object(o)))
 
-
-	def triples(self, p=None, o=None):
-
-		'''
-		convenience method for self.rdf.graph.triples
-
-		Args:
-			p (rdflib.term.URIRef): predicate
-			o (): object
-
-		Returns:
-			(generator)
-
-		'''
-
-		return self.rdf.graph.triples((self.uri, p, o))
+		# refresh self.rdf.triples
+		if refresh_quick_triples:
+			self.parse_object_like_triples()
 
 
 	# update RDF, and for NonRDFSource, binaries
