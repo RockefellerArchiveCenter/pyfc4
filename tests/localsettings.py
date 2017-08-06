@@ -1,0 +1,5 @@
+# settings for tests
+
+REPO_ROOT = 'http://localhost:8080/fcrepo/rest'
+REPO_USERNAME = 'fedoraAdmin'
+REPO_PASSWORD = 'secret3'
