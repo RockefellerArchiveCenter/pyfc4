@@ -2,7 +2,7 @@
 
 from pyfc4.models import *
 
-import localsettings
+from tests import localsettings
 
 import datetime
 import inspect
