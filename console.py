@@ -15,7 +15,7 @@ pyfc4 debug/convenience console.  All our triples are belong to you.
 ''')
 
 # console configurations
-REPO_ROOT = 'http://localhost:8080/fcrepo/rest'
+REPO_ROOT = 'http://localhost:8080/rest'
 REPO_USERNAME = 'fedoraAdmin'
 REPO_PASSWORD = 'secret3'
 
