@@ -257,6 +257,38 @@ class TestBinaryUpload(object):
 		assert baz2.exists
 
 
+	# instantiate two binary resources, confirm headers don't cross-pollinate
+	def test_multiple_binary_creation(self):
+
+		'''
+		this will prepare two binary resources for upload,
+		and confirm that headers don't cross-pollinate
+		'''
+
+		# prepare first binary resource
+		rbin1 = Binary(repo, '%s/rbin1' % testing_container_uri)
+		rbin1.binary.data = 'this is test data 1'
+		rbin1.binary.mimetype = 'text/plain'
+		rbin1.create(specify_uri=True)
+		assert rbin1.exists
+
+		# prepare second, confirm that headers are empty
+		rbin2 = Binary(repo, '%s/rbin2' % testing_container_uri)
+		rbin2.binary.data = '<ele>test</ele>'
+
+		assert rbin2.headers == {}
+		assert not rbin2.binary.mimetype
+
+		# create, and confirm different data
+		rbin2.binary.mimetype = 'text/xml'
+		rbin2.create(specify_uri=True)
+
+		# get both
+		rbin1_get = repo.get_resource('%s/rbin1' % testing_container_uri)
+		rbin2_get = repo.get_resource('%s/rbin2' % testing_container_uri)
+		assert rbin1_get.binary.data.content != rbin2_get.binary.data.content
+
+
 
 class TestBasicRelationship(object):
 
@@ -625,7 +657,7 @@ class TestVersions(object):
 		assert type(baz.versions.v1) == ResourceVersion	
 
 
-# versioning
+# fixity
 class TestFixity(object):
 
 	def test_fixity_check(self):
