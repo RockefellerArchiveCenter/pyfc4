@@ -193,9 +193,7 @@ class Repository(object):
 			# fire request
 			return resource_type(self,
 				uri,
-				data=get_response.content,
-				headers=get_response.headers,
-				status_code=get_response.status_code)
+				response=get_response)
 
 		else:
 			raise Exception('HTTP %s, error retrieving resource uri %s' % (head_response.status_code, uri))
@@ -703,9 +701,7 @@ class Resource(object):
 	def __init__(self,
 		repo,
 		uri=None,
-		data=None,
-		headers={},
-		status_code=None,
+		response=None,
 		rdf_prefixes_mixins=None):
 
 		# repository handle is pinned to resource instance here
@@ -715,16 +711,27 @@ class Resource(object):
 		self.uri = self.repo.parse_uri(uri)
 		
 		# HTTP
-		self.headers = headers
-		self.status_code = status_code
-		# if status_code provided, and 200, set exists attribute as True
-		if self.status_code == 200:
-			self.exists = True
+
+		# if response provided, parse and set to attributes
+		if response:
+			self.response = response
+			self.data = self.response.content
+			self.headers = self.response.headers
+			self.status_code = self.response.status_code
+			# if response, and status_code is 200, set True
+			if self.status_code == 200:
+				self.exists = True
+
+		# if not response, set all blank
 		else:
+			self.response = None
+			self.data = None
+			self.headers = {}
+			self.status_code = None
 			self.exists = False
 
 		# RDF
-		self._build_rdf(data=data)
+		self._build_rdf(data=self.data)
 
 		# versions
 		self.versions = SimpleNamespace()
@@ -1561,12 +1568,12 @@ class NonRDFSource(Resource):
 		status_code (int): passed from sub-classes
 	'''
 	
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, response=None):
 
 		self.mimetype = None
 
 		# fire parent Resource init()
-		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, response=response)
 
 		# binary data
 		self._build_binary()
@@ -1798,10 +1805,10 @@ class RDFResource(Resource):
 		status_code (int): passed from sub-classes
 	'''
 	
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, response=None):
 		
 		# fire parent Resource init()
-		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, response=response)
 
 
 
@@ -1827,10 +1834,10 @@ class Container(RDFResource):
 		status_code (int): passed from sub-classes
 	'''
 
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, response=None):
 		
 		# fire parent RDFResource init()
-		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, response=response)
 
 
 
@@ -1856,10 +1863,10 @@ class BasicContainer(Container):
 		status_code (int): passed from sub-classes
 	'''
 	
-	def __init__(self, repo, uri=None, data=None, headers={}, status_code=None):
+	def __init__(self, repo, uri=None, response=None):
 
 		# fire parent Container init()
-		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, response=response)
 
 
 
@@ -1889,14 +1896,12 @@ class DirectContainer(Container):
 	def __init__(self,
 		repo,
 		uri=None,
-		data=None,
-		headers={},
-		status_code=None,
+		response=None,
 		membershipResource=None,
 		hasMemberRelation=None):
 
 		# fire parent Container init()
-		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, response=response)
 
 		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
@@ -1934,15 +1939,13 @@ class IndirectContainer(Container):
 	def __init__(self,
 		repo,
 		uri=None,
-		data=None,
-		headers={},
-		status_code=None,
+		response=None,
 		membershipResource=None,
 		hasMemberRelation=None,
 		insertedContentRelation=None):
 
 		# fire parent Container init()
-		super().__init__(repo, uri=uri, data=data, headers=headers, status_code=status_code)
+		super().__init__(repo, uri=uri, response=response)
 	
 		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.IndirectContainer)
