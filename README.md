@@ -17,8 +17,9 @@ pip install -e .
 
 ## Tests
 
-Requires `pyfc4` installed as module, and without any configuration, an instance of FC4 running at `http://localhost:8080/rest`.
+Copy `tests/localsettings.py.template` to `tests/localsettings.py` and edit to point at your instance of Fedora.
 
+Then run:
 ```
 ./runtests.sh
 ```
