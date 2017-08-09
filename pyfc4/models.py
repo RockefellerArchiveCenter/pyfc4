@@ -692,9 +692,7 @@ class Resource(object):
 	Args:
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
-		data (): passed from sub-classes
-		headers (dict): passed from sub-classes
-		status_code (int): passed from sub-classes
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 		rdf_prefixes_mixins (dict): optional rdf prefixes and namespaces
 	'''
 	
@@ -710,7 +708,7 @@ class Resource(object):
 		# parse uri with parse_uri() from repo instance
 		self.uri = self.repo.parse_uri(uri)
 		
-		# HTTP
+		# parse response
 
 		# if response provided, parse and set to attributes
 		if response:
@@ -1563,9 +1561,7 @@ class NonRDFSource(Resource):
 	Args:
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
-		data (): passed from sub-classes
-		headers (dict): passed from sub-classes
-		status_code (int): passed from sub-classes
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 	
 	def __init__(self, repo, uri=None, response=None):
@@ -1800,9 +1796,7 @@ class RDFResource(Resource):
 	Args:
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
-		data (): passed from sub-classes
-		headers (dict): passed from sub-classes
-		status_code (int): passed from sub-classes
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 	
 	def __init__(self, repo, uri=None, response=None):
@@ -1829,9 +1823,7 @@ class Container(RDFResource):
 	Args:
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
-		data (): passed from sub-classes
-		headers (dict): passed from sub-classes
-		status_code (int): passed from sub-classes
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
 	def __init__(self, repo, uri=None, response=None):
@@ -1858,9 +1850,7 @@ class BasicContainer(Container):
 	Args:
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
-		data (): passed from sub-classes
-		headers (dict): passed from sub-classes
-		status_code (int): passed from sub-classes
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 	
 	def __init__(self, repo, uri=None, response=None):
@@ -1886,9 +1876,7 @@ class DirectContainer(Container):
 	Args:
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
-		data (): passed from sub-classes
-		headers (dict): passed from sub-classes
-		status_code (int): passed from sub-classes
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 		membershipResource (rdflib.term.URIRef): resource that will accumlate triples as children are added
 		hasMemberRelation (rdflib.term.URIRef): predicate that will be used when pointing from URI in ldp:membershipResource to children
 	'''
@@ -1928,9 +1916,7 @@ class IndirectContainer(Container):
 	Args:
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
-		data (): passed from sub-classes
-		headers (dict): passed from sub-classes
-		status_code (int): passed from sub-classes
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 		membershipResource (rdflib.term): resource that will accumlate triples as children are added
 		hasMemberRelation (rdflib.term): predicate that will be used when pointing from URI in ldp:membershipResource to ldp:insertedContentRelation
 		insertedContentRelation (rdflib.term): destination for ldp:hasMemberRelation from ldp:membershipResource
