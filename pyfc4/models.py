@@ -988,18 +988,29 @@ class Resource(object):
 			raise Exception('Instantiated %s, but repository reports this resource is %s' % (type(updated_self), type(self)) )
 
 		if updated_self:
+
 			# update attributes
 			self.status_code = updated_self.status_code
 			self.rdf.data = updated_self.rdf.data
 			self.headers = updated_self.headers
 			self.exists = updated_self.exists
+
 			# update graph if RDFSource
 			if type(self) != NonRDFSource:
 				self._parse_graph()
+
 			# empty versions
 			self.versions = SimpleNamespace()
+
+			# if NonRDF, set binary attributes
+			if type(updated_self) == NonRDFSource:
+				logger.debug('setting binary attributes')
+				self.binary.mimetype = updated_self.binary.mimetype
+				self.binary.data = updated_self.binary.data
+
 			# cleanup
 			del(updated_self)
+
 		else:
 			logger.debug('resource %s not found, dumping values')
 			self._empty_resource_attributes()
