@@ -11,9 +11,9 @@ sudo: required
 services:
   - docker
 before_install:
-  - docker pull thomaszastrow/fedora-commons
-  - docker run -d=true -p 8080:8080 -t -i thomaszastrow/fedora-commons /bin/bash
-  - echo "import time; time.sleep(60)" | python
+  - docker pull yinlinchen/fcrepo4-docker
+  - docker run -it -p 8080:8080 -p 9080:9080 -d yinlinchen/fcrepo4-docker:4.7.3
+  - echo "import time; time.sleep(300)" | python
   - cp tests/localsettings.py.template tests/localsettings.py
 python:
   - "3.5"
