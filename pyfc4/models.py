@@ -287,6 +287,7 @@ class Repository(object):
 			raise Exception('HTTP %s, could not retrieve transaction' % txn_response.status_code)
 
 
+
 # Transaction
 class Transaction(Repository):
 
@@ -421,6 +422,7 @@ class Transaction(Repository):
 
 		# fire _close method
 		return self._close('rollback')
+
 
 
 # API
@@ -578,6 +580,7 @@ class API(object):
 		return graph
 
 
+
 # SparqlUpdate
 class SparqlUpdate(object):
 
@@ -674,6 +677,7 @@ class SparqlUpdate(object):
 
 		# return query
 		return sparql_query
+
 
 
 # Resource
@@ -1495,6 +1499,7 @@ class Resource(object):
 			self._affix_version(version_uri, version_label)
 
 
+
 # Resource Version
 class ResourceVersion(Resource):
 
@@ -1569,6 +1574,7 @@ class ResourceVersion(Resource):
 
 
 
+# Binary Data
 class BinaryData(object):
 
 	'''
@@ -1595,6 +1601,16 @@ class BinaryData(object):
 
 
 	def refresh(self, updated_self):
+
+		'''
+		method to refresh binary attributes and data
+
+		Args:
+			updated_self (Resource): resource this binary data attaches to
+
+		Returns:
+			None: updates attributes
+		'''
 
 		logger.debug('refreshing binary attributes')
 		self.mimetype = updated_self.binary.mimetype
@@ -1815,6 +1831,7 @@ class NonRDFSource(Resource):
 
 # 'Binary' is an alias for NonRDFSource
 Binary = NonRDFSource
+
 
 
 # RDF Source
