@@ -17,8 +17,19 @@ pyfc4 debug/convenience console.  All our triples are belong to you.
 # console configurations
 from tests.localsettings import *
 
-# instantiate repository
-repo = Repository(REPO_ROOT, REPO_USERNAME, REPO_PASSWORD, context={'foo':'http://foo.com/ontology/','bar':'http://bar.org#'})
+# instantiate repository handles
+repo = Repository(
+	REPO_ROOT,
+	REPO_USERNAME,
+	REPO_PASSWORD,
+	context={'foo':'http://foo.com/ontology/','bar':'http://bar.org#'})
+
+fast_repo = Repository(
+	REPO_ROOT,
+	REPO_USERNAME,
+	REPO_PASSWORD,
+	default_auto_refresh=False
+	)
 
 '''
 The following functions are created entirely for convenience/testing purposes.
