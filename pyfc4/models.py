@@ -1003,8 +1003,7 @@ class Resource(object):
 			self.versions = SimpleNamespace()
 
 			# if NonRDF, set binary attributes
-			if type(self) == NonRDFSource:
-				logger.debug("############# UPDATING NONRDF ###############")
+			if type(updated_self) == NonRDFSource:
 				self.binary.refresh(updated_self)
 
 			# cleanup
@@ -1295,16 +1294,20 @@ class Resource(object):
 				self.parse_object_like_triples()
 
 
-	def update(self, sparql_query_only=False, auto_refresh=None):
+	def update(self, sparql_query_only=False, auto_refresh=None, update_binary=True):
 
 		'''
 		Method to update resources in repository.  Firing this method computes the difference in the local modified graph and the original one, 
 		creates an instance of SparqlUpdate and builds a sparql query that represents these differences, and sends this as a PATCH request.
 
+		Note: send PATCH request, regardless of RDF or NonRDF, to [uri]/fcr:metadata
+
 		If the resource is NonRDF (Binary), this also method also updates the binary data.
 
 		Args:
 			sparql_query_only (bool): If True, returns only the sparql query string and does not perform any actual updates
+			auto_refresh (bool): If True, refreshes resource after update. If left None, defaults to repo.default_auto_refresh
+			update_binary (bool): If True, and resource is NonRDF, updates binary data as well
 
 		Returns:
 			(bool) 
@@ -1317,12 +1320,17 @@ class Resource(object):
 			return sq.build_query()
 		response = self.repo.api.http_request(
 			'PATCH',
-			self.uri,
+			'%s/fcr:metadata' % self.uri, # send RDF updates to URI/fcr:metadata
 			data=sq.build_query(),
 			headers={'Content-Type':'application/sparql-update'})
 
+		# if RDF update not 204, raise Exception
+		if response.status_code != 204:
+			logger.debug(response.content)
+			raise Exception('HTTP %s, expecting 204' % response.status_code)
+
 		# if NonRDFSource, update binary as well
-		if type(self) == NonRDFSource:
+		if type(self) == NonRDFSource and update_binary and type(self.binary.data) != requests.models.Response:
 			self.binary._prep_binary()
 			binary_data = self.binary.data
 			binary_response = self.repo.api.http_request(
@@ -1330,17 +1338,20 @@ class Resource(object):
 				self.uri,
 				data=binary_data,
 				headers={'Content-Type':self.binary.mimetype})
-			# updated_self = self.repo.get_resource(self.uri)
-			# self.binary.refresh(updated_self)
 
-		# if status_code == 204, resource changed, refresh graph
-		if response.status_code == 204:
-			if auto_refresh:
+			# if not refreshing RDF, still update binary here
+			if not auto_refresh and not self.repo.default_auto_refresh:
+				logger.debug("not refreshing resource RDF, but updated binary, so must refresh binary data")
+				updated_self = self.repo.get_resource(self.uri)
+				self.binary.refresh(updated_self)
+
+		# determine refreshing
+		if auto_refresh:
+			self.refresh()
+		elif auto_refresh == None:
+			if self.repo.default_auto_refresh:
 				self.refresh()
-			elif auto_refresh == None:
-				if self.repo.default_auto_refresh:
-					self.refresh()
-			return True
+		return True
 
 
 	def children(self, as_resources=False):
