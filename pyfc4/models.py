@@ -1003,7 +1003,8 @@ class Resource(object):
 			self.versions = SimpleNamespace()
 
 			# if NonRDF, set binary attributes
-			if type(updated_self) == NonRDFSource:
+			if type(self) == NonRDFSource:
+				logger.debug("############# UPDATING NONRDF ###############")
 				self.binary.refresh(updated_self)
 
 			# cleanup
@@ -1294,7 +1295,6 @@ class Resource(object):
 				self.parse_object_like_triples()
 
 
-	# update RDF, and for NonRDFSource, binaries
 	def update(self, sparql_query_only=False, auto_refresh=None):
 
 		'''
@@ -1330,8 +1330,8 @@ class Resource(object):
 				self.uri,
 				data=binary_data,
 				headers={'Content-Type':self.binary.mimetype})
-			updated_self = self.repo.get_resource(self.uri)
-			self.binary.refresh(updated_self)
+			# updated_self = self.repo.get_resource(self.uri)
+			# self.binary.refresh(updated_self)
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
