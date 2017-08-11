@@ -690,6 +690,10 @@ class TestUpdatesRefresh(object):
 
 	def test_update_without_refresh(self):
 
+		'''
+		confirm that no refresh takes place after update
+		'''
+
 		# add triple, but confirm no refresh
 		foo = repo.get_resource('%s/foo' % testing_container_uri)
 		foo.add_triple(foo.rdf.prefixes.test.favorite_number, 42)
@@ -713,7 +717,7 @@ class TestUpdatesRefresh(object):
 		'''
 
 		# open with fast_repo, defaults to not auto_refresh
-		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
+		baz = fast_repo.get_resource('%s/foo/baz' % testing_container_uri)
 
 		# update binary info, then confirm response object
 		baz.binary.data = 'new car smell'
@@ -722,6 +726,29 @@ class TestUpdatesRefresh(object):
 		assert type(baz.binary.data) == requests.models.Response
 
 
+	def test_update_binary_rdf_not_data(self):
+
+		'''
+		unique situation where one might want to update the RDF for a binary resource,
+		and refresh the RDF, but not touch the binary data
+		'''
+
+		# retrieve foo/baz
+		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
+
+		# alter binary.data
+		baz.binary.data = 'still preparing for update, but not ready yet...'
+
+		# alter RDF and update
+		baz.add_triple(baz.rdf.prefixes.test.favorite_number, 42)
+		baz.update(update_binary=False)
+
+		# confirm that self.binary.data is not response object, but still altered value
+		assert type(baz.binary.data) == str
+
+		# then, update as normal, thereby updating binary
+		baz.update()
+		assert type(baz.binary.data) == requests.models.Response
 
 
 

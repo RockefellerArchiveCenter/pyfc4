@@ -969,7 +969,7 @@ class Resource(object):
 		return True
 
 
-	def refresh(self):
+	def refresh(self, refresh_binary=True):
 		
 		'''
 		Performs GET request and refreshes RDF information for resource.
@@ -1003,7 +1003,7 @@ class Resource(object):
 			self.versions = SimpleNamespace()
 
 			# if NonRDF, set binary attributes
-			if type(updated_self) == NonRDFSource:
+			if type(updated_self) == NonRDFSource and refresh_binary:
 				self.binary.refresh(updated_self)
 
 			# cleanup
@@ -1329,7 +1329,7 @@ class Resource(object):
 			logger.debug(response.content)
 			raise Exception('HTTP %s, expecting 204' % response.status_code)
 
-		# if NonRDFSource, update binary as well
+		# if NonRDFSource, and self.binary.data is not a Response object, update binary as well
 		if type(self) == NonRDFSource and update_binary and type(self.binary.data) != requests.models.Response:
 			self.binary._prep_binary()
 			binary_data = self.binary.data
@@ -1346,11 +1346,14 @@ class Resource(object):
 				self.binary.refresh(updated_self)
 
 		# determine refreshing
+		'''
+		If not updating binary, pass that bool to refresh as refresh_binary flag to avoid touching binary data
+		'''
 		if auto_refresh:
-			self.refresh()
+			self.refresh(refresh_binary=update_binary)
 		elif auto_refresh == None:
 			if self.repo.default_auto_refresh:
-				self.refresh()
+				self.refresh(refresh_binary=update_binary)
 		return True
 
 
