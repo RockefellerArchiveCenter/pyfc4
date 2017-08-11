@@ -21,8 +21,22 @@ logger.setLevel(logging.DEBUG)
 # target location for testing container
 testing_container_uri = 'testing'
 
-# instantiate repository
-repo = Repository(localsettings.REPO_ROOT,localsettings.REPO_USERNAME,localsettings.REPO_PASSWORD, context={'foo':'http://foo.com'})
+# instantiate repository handles
+
+# full refresh, defaults
+repo = Repository(
+	localsettings.REPO_ROOT,
+	localsettings.REPO_USERNAME,
+	localsettings.REPO_PASSWORD,
+	context={'foo':'http://foo.com'})
+
+# more performant, defaults to not refresh
+fast_repo = Repository(
+	localsettings.REPO_ROOT,
+	localsettings.REPO_USERNAME,
+	localsettings.REPO_PASSWORD,
+	default_auto_refresh=False
+	)
 
 
 
@@ -669,6 +683,47 @@ class TestFixity(object):
 		assert 'verdict' in fixity_check.keys()
 		assert 'premis_graph' in fixity_check.keys()
 		assert type(fixity_check['premis_graph']) == rdflib.Graph
+
+
+# updates and refreshing
+class TestUpdatesRefresh(object):
+
+	def test_update_without_refresh(self):
+
+		# add triple, but confirm no refresh
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+		foo.add_triple(foo.rdf.prefixes.test.favorite_number, 42)
+		foo.update(auto_refresh=False)
+
+		# assert graph diff still shows triple added (which would not be present after refresh)
+		foo._diff_graph()
+		assert len(list(foo.rdf.diffs.added)) == 1
+
+		# refresh, then assert zero
+		foo.refresh()
+		foo._diff_graph()
+		assert len(list(foo.rdf.diffs.added)) == 0
+
+
+	def test_binary_update_data_type(self):
+
+		'''
+		when updating NonRDF resources, confirm that self.binary.data is response object
+		with and without auto_refresh
+		'''
+
+		# open with fast_repo, defaults to not auto_refresh
+		baz = repo.get_resource('%s/foo/baz' % testing_container_uri)
+
+		# update binary info, then confirm response object
+		baz.binary.data = 'new car smell'
+		baz.binary.mimetype = 'text/plain'
+		baz.update()
+		assert type(baz.binary.data) == requests.models.Response
+
+
+
+
 
 
 ########################################################

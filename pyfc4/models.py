@@ -190,7 +190,7 @@ class Repository(object):
 				"%s/fcr:metadata" % uri,
 				response_format=response_format)
 
-			# fire request
+			# return resource
 			return resource_type(self,
 				uri,
 				response=get_response)
