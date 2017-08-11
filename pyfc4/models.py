@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 
-
+# Repository
 class Repository(object):
 	
 	'''
@@ -287,7 +287,7 @@ class Repository(object):
 			raise Exception('HTTP %s, could not retrieve transaction' % txn_response.status_code)
 
 
-
+# Transaction
 class Transaction(Repository):
 
 	'''
@@ -423,7 +423,7 @@ class Transaction(Repository):
 		return self._close('rollback')
 
 
-
+# API
 class API(object):
 
 	'''
@@ -578,7 +578,7 @@ class API(object):
 		return graph
 
 
-
+# SparqlUpdate
 class SparqlUpdate(object):
 
 	'''
@@ -676,7 +676,7 @@ class SparqlUpdate(object):
 		return sparql_query
 
 
-
+# Resource
 class Resource(object):
 
 	'''
@@ -800,9 +800,9 @@ class Resource(object):
 			
 			logger.debug('creating resource %s with verb %s' % (self.uri, verb))
 
-			# check if NonRDFSource, if so, run _prep_binary_data() and set data to self.binary.data
+			# check if NonRDFSource, if so, run self.binary._prep_binary()
 			if type(self) == NonRDFSource:
-				self._prep_binary_data()
+				self.binary._prep_binary()
 				data = self.binary.data
 
 			# otherwise, prep for RDF
@@ -1004,9 +1004,7 @@ class Resource(object):
 
 			# if NonRDF, set binary attributes
 			if type(updated_self) == NonRDFSource:
-				logger.debug('setting binary attributes')
-				self.binary.mimetype = updated_self.binary.mimetype
-				self.binary.data = updated_self.binary.data
+				self.binary.refresh(updated_self)
 
 			# cleanup
 			del(updated_self)
@@ -1325,13 +1323,15 @@ class Resource(object):
 
 		# if NonRDFSource, update binary as well
 		if type(self) == NonRDFSource:
-			self._prep_binary_data()
+			self.binary._prep_binary()
 			binary_data = self.binary.data
 			binary_response = self.repo.api.http_request(
 				'PUT',
 				self.uri,
 				data=binary_data,
 				headers={'Content-Type':self.binary.mimetype})
+			updated_self = self.repo.get_resource(self.uri)
+			self.binary.refresh(updated_self)
 
 		# if status_code == 204, resource changed, refresh graph
 		if response.status_code == 204:
@@ -1481,7 +1481,7 @@ class Resource(object):
 			self._affix_version(version_uri, version_label)
 
 
-
+# Resource Version
 class ResourceVersion(Resource):
 
 	'''
@@ -1555,40 +1555,37 @@ class ResourceVersion(Resource):
 
 
 
-# NonRDF Source
-class NonRDFSource(Resource):
+class BinaryData(object):
 
 	'''
-	Linked Data Platform Non-RDF Source (LDP-NR)
-	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
-	https://www.w3.org/TR/ldp/
-
-	Note: When a pre-existing NonRDFSource is retrieved, the binary data is stored under self.binary.data as a
-	streamable requests object.
-
-	Inherits:
-		Resource
+	Class to handle binary data for NonRDFSource (Binary) resources
+	Builds out self.binary, and provides some method for setting/accessing binary data
 
 	Args:
-		repo (Repository): instance of Repository class
-		uri (rdflib.term.URIRef,str): input URI
-		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		resource (NonRDFSource): instance of NonRDFSource resource
 	'''
-	
-	def __init__(self, repo, uri=None, response=None):
 
-		self.mimetype = None
-
-		# fire parent Resource init()
-		super().__init__(repo, uri=uri, response=response)
-
-		# binary data
-		self._build_binary()
+	def __init__(self, resource):
 		
-		# like RDF, if exists, retrieve binary data
-		if self.exists:
+		# scaffold
+		self.resource = resource
+		self.delivery = None
+		self.data = None
+		self.stream = False
+		self.mimetype = None
+		self.location = None
+
+		# if resource exists, issue GET and prep for use
+		if self.resource.exists:
 			self.parse_binary()
-			
+
+
+	def refresh(self, updated_self):
+
+		logger.debug('refreshing binary attributes')
+		self.mimetype = updated_self.binary.mimetype
+		self.data = updated_self.binary.data
+
 
 	def parse_binary(self):
 
@@ -1598,43 +1595,21 @@ class NonRDFSource(Resource):
 		'''
 
 		# derive mimetype
-		self.binary.mimetype = self.rdf.graph.value(
-			self.uri,
-			self.rdf.prefixes.ebucore.hasMimeType).toPython()
+		self.mimetype = self.resource.rdf.graph.value(
+			self.resource.uri,
+			self.resource.rdf.prefixes.ebucore.hasMimeType).toPython()
 		
 		# get binary content as stremable response
-		self.binary.data = self.repo.api.http_request(
+		self.data = self.resource.repo.api.http_request(
 			'GET',
-			self.uri,
+			self.resource.uri,
 			data=None,
-			headers={'Content-Type':self.binary.mimetype},
+			headers={'Content-Type':self.resource.mimetype},
 			is_rdf=False,
 			stream=True)
 
 
-	def _build_binary(self):
-
-		'''
-		builds binary attributes for resource
-
-		Args:
-			None
-
-		Return:
-			None: sets various attributes
-		'''
-
-		# binary data
-		self.binary = SimpleNamespace()
-		self.binary.delivery = None
-		self.binary.data = None
-		self.binary.stream = False
-		self.binary.mimetype = None # convenience attribute that is written to headers['Content-Type'] for create/update
-		self.binary.location = None
-		self.binary.range = self.byte_range
-
-
-	def _prep_binary_data(self):
+	def _prep_binary(self):
 
 		'''
 		method is used to check/prep data and headers for NonRDFSource create or update
@@ -1669,14 +1644,14 @@ class NonRDFSource(Resource):
 		'''
 
 		# neither present
-		if not self.binary.mimetype and 'Content-Type' not in self.headers.keys():
+		if not self.mimetype and 'Content-Type' not in self.resource.headers.keys():
 			raise Exception('to create/update NonRDFSource, mimetype or Content-Type header is required')
 		
 		# mimetype, no Content-Type
-		elif self.binary.mimetype and 'Content-Type' not in self.headers.keys():
+		elif self.mimetype and 'Content-Type' not in self.resource.headers.keys():
 			logger.debug('setting Content-Type header with provided mimetype: %s'
-				% self.binary.mimetype)
-			self.headers['Content-Type'] = self.binary.mimetype
+				% self.mimetype)
+			self.resource.headers['Content-Type'] = self.mimetype
 
 
 	def _prep_binary_content(self):
@@ -1693,35 +1668,100 @@ class NonRDFSource(Resource):
 		'''
 
 		# nothing present
-		if not self.binary.data and not self.binary.location and 'Content-Location' not in self.headers.keys():
+		if not self.data and not self.location and 'Content-Location' not in self.resource.headers.keys():
 			raise Exception('creating/updating NonRDFSource requires content from self.binary.data, self.binary.location, or the Content-Location header')
 
-		elif 'Content-Location' in self.headers.keys():
+		elif 'Content-Location' in self.resource.headers.keys():
 			logger.debug('Content-Location header found, using')
-			self.binary.delivery = 'header'
+			self.delivery = 'header'
 		
 		# if Content-Location is not set, look for self.data_location then self.data
-		elif 'Content-Location' not in self.headers.keys():
+		elif 'Content-Location' not in self.resource.headers.keys():
 
 			# data_location set, trumps Content self.data
-			if self.binary.location:
+			if self.location:
 				# set appropriate header
-				self.headers['Content-Location'] = self.binary.location
-				self.binary.delivery = 'header'
+				self.resource.headers['Content-Location'] = self.location
+				self.delivery = 'header'
 
 			# data attribute is plain text, binary, or file-like object
-			elif self.binary.data:
+			elif self.data:
 
 				# if file-like object, set flag for api.http_request
-				if isinstance(self.binary.data, io.BufferedIOBase):
+				if isinstance(self.data, io.BufferedIOBase):
 					logger.debug('detected file-like object')
-					self.binary.delivery = 'payload'
+					self.delivery = 'payload'
 
 				# else, just bytes
 				else:
 					logger.debug('detected bytes')
-					self.binary.delivery = 'payload'
+					self.delivery = 'payload'
 
+
+	def range(self, byte_start, byte_end, stream=True):
+
+		'''
+		method to return a particular byte range from NonRDF resource's binary data
+		https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+
+		Args:
+			byte_start(int): position of range start 
+			byte_end(int): position of range end
+
+		Returns:
+			(requests.Response): streamable response
+		'''
+
+		response = self.resource.repo.api.http_request(
+			'GET',
+			self.resource.uri,
+			data=None,
+			headers={
+				'Content-Type':self.mimetype,
+				'Range':'bytes=%s-%s' % (byte_start, byte_end)
+			},
+			is_rdf=False,
+			stream=stream)
+
+		# expects 206
+		if response.status_code == 206:
+			return response
+
+		else:
+			raise Exception('HTTP %s, but was expecting 206' % response.status_code)
+
+
+
+# NonRDF Source
+class NonRDFSource(Resource):
+
+	'''
+	Linked Data Platform Non-RDF Source (LDP-NR)
+	An LDPR whose state is not represented in RDF. For example, these can be binary or text documents that do not have useful RDF representations.
+	https://www.w3.org/TR/ldp/
+
+	Note: When a pre-existing NonRDFSource is retrieved, the binary data is stored under self.binary.data as a
+	streamable requests object.
+
+	Inherits:
+		Resource
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+	'''
+	
+	def __init__(self, repo, uri=None, response=None):
+
+		self.mimetype = None
+
+		# fire parent Resource init()
+		super().__init__(repo, uri=uri, response=response)
+
+		# build binary data with BinaryData class instance
+		self.binary = BinaryData(self)
+		
 
 	def fixity(self, response_format=None):
 
@@ -1757,33 +1797,6 @@ class NonRDFSource(Resource):
 			'premis_graph':fixity_graph
 		}
 
-
-	def byte_range(self, byte_start, byte_end, stream=False):
-
-		'''
-		method to return a particular byte range from NonRDF resource's binary data
-		https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-
-		Args:
-			byte_start(int): position of range start 
-			byte_end(int): position of range end
-
-		Returns:
-			(requests.Response): streamable response
-		'''
-
-		response = self.repo.api.http_request(
-			'GET',
-			self.uri,
-			data=None,
-			headers={
-				'Content-Type':self.binary.mimetype,
-				'Range':'bytes=%s-%s' % (byte_start, byte_end)
-			},
-			is_rdf=False,
-			stream=stream)
-
-		return response
 
 
 # 'Binary' is an alias for NonRDFSource
