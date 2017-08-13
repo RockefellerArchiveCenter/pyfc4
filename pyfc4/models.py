@@ -53,7 +53,8 @@ class Repository(object):
 		'xs':'http://www.w3.org/2001/XMLSchema',
 		'fedoraconfig':'http://fedora.info/definitions/v4/config#',
 		'foaf':'http://xmlns.com/foaf/0.1/',
-		'dc':'http://purl.org/dc/elements/1.1/'
+		'dc':'http://purl.org/dc/elements/1.1/',
+		'pcdm':'http://pcdm.org/models#'
 	}
 
 	def __init__(self, 
