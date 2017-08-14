@@ -82,6 +82,11 @@ class Repository(object):
 		# API facade
 		self.api = API(self)
 
+		# instantiate namespace_manager
+		self.namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
+		for ns_prefix, ns_uri in self.context.items():
+			self.namespace_manager.bind(ns_prefix, ns_uri, override=False)
+
 		# if context provided, merge with defaults
 		if context:
 			logger.debug('context provided, merging with defaults')
@@ -516,6 +521,8 @@ class API(object):
 		'''
 		parse resource type from self.http_request()
 
+		Note: uses isinstance() as plugins may extend these base LDP resource type.
+
 		Args:
 			response (requests.models.Response): response object
 
@@ -525,23 +532,29 @@ class API(object):
 		
 		# parse 'Link' header
 		links = [
-			link.split(";")[0]
+			link.split(";")[0].lstrip('<').rstrip('>')
 			for link in response.headers['Link'].split(', ')
 			if link.startswith('<http://www.w3.org/ns/ldp#')]
-		logger.debug('parsed Link headers: %s' % links)
-		
+
+		# parse resource type string with self.repo.namespace_manager.compute_qname()
+		ldp_resource_types = [
+			self.repo.namespace_manager.compute_qname(resource_type)[2]
+			for resource_type in links]
+
+		logger.debug('Parsed LDP resource types from LINK header: %s' % ldp_resource_types)
+
 		# with LDP types in hand, select appropriate resource type
 		# NonRDF Source
-		if '<http://www.w3.org/ns/ldp#NonRDFSource>' in links:
+		if 'NonRDFSource' in ldp_resource_types:
 			return NonRDFSource
 		# Basic Container
-		elif '<http://www.w3.org/ns/ldp#BasicContainer>' in links:
+		elif 'BasicContainer' in ldp_resource_types:
 			return BasicContainer
 		# Direct Container
-		elif '<http://www.w3.org/ns/ldp#DirectContainer>' in links:
+		elif 'DirectContainer' in ldp_resource_types:
 			return DirectContainer
 		# Indirect Container
-		elif '<http://www.w3.org/ns/ldp#IndirectContainer>' in links:
+		elif 'IndirectContainer' in ldp_resource_types:
 			return IndirectContainer
 		else:
 			logger.debug('could not determine resource type from Link header, returning False')
@@ -843,6 +856,9 @@ class Resource(object):
 			elif auto_refresh == None:
 				if self.repo.default_auto_refresh:
 					self.refresh()
+			# fire resource._post_create hook if exists
+			if hasattr(self,'_post_create'):
+				self._post_create()
 
 		# 404, assumed POST, target location does not exist
 		elif response.status_code == 404:
@@ -989,7 +1005,7 @@ class Resource(object):
 		updated_self = self.repo.get_resource(self.uri)
 
 		# if resource type of updated_self != self, raise exception
-		if type(updated_self) != type(self):
+		if not isinstance(self, type(updated_self)):
 			raise Exception('Instantiated %s, but repository reports this resource is %s' % (type(updated_self), type(self)) )
 
 		if updated_self:
@@ -1950,6 +1966,10 @@ class DirectContainer(Container):
 		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
 
+		# save membershipResource, hasMemberRelation		
+		self.membershipResource = membershipResource
+		self.hasMemberRelation = hasMemberRelation
+
 		# if membershipResource or hasMemberRelation args are set, set triples
 		if membershipResource:
 			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
@@ -1991,6 +2011,11 @@ class IndirectContainer(Container):
 	
 		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.IndirectContainer)
+
+		# save membershipResource, hasMemberRelation		
+		self.membershipResource = membershipResource
+		self.hasMemberRelation = hasMemberRelation
+		self.insertedContentRelation = insertedContentRelation
 
 		# if membershipResource, hasMemberRelation, or insertedContentRelation args are set, set triples
 		if membershipResource:
