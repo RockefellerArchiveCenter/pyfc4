@@ -1,6 +1,10 @@
 # console
 
+# import base models
 from pyfc4.models import *
+
+# import pcdm
+from pyfc4.plugins import pcdm
 
 # logging
 import logging
