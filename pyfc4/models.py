@@ -153,7 +153,7 @@ class Repository(object):
 			raise TypeError("expecting Resource type, such as BasicContainer or NonRDFSource")
 
 
-	def get_resource(self, uri, response_format=None):
+	def get_resource(self, uri, resource_type=None, response_format=None):
 
 		'''
 		return appropriate Resource-type instance
@@ -162,6 +162,7 @@ class Repository(object):
 
 		Args:
 			uri (rdflib.term.URIRef,str): input URI
+			resource_type (): resource class e.g. BasicContainer, NonRDFSource, or extensions thereof
 			response_format (str): expects mimetype / Content-Type header such as 'application/rdf+xml', 'text/turtle', etc.
 
 		Returns:
@@ -186,8 +187,10 @@ class Repository(object):
 		# assume exists, parse headers for resource type and return instance
 		elif head_response.status_code == 200:
 
-			# parse LDP resource type from headers
-			resource_type = self.api.parse_resource_type(head_response)
+			# if resource_type not provided
+			if not resource_type:
+				# parse LDP resource type from headers
+				resource_type = self.api.parse_resource_type(head_response)
 			logger.debug('using resource type: %s' % resource_type)
 
 			# fire GET request

@@ -3,7 +3,7 @@
 # import base models
 from pyfc4.models import *
 
-# import pcdm
+# import pcdm plugin
 from pyfc4.plugins import pcdm
 
 # logging
