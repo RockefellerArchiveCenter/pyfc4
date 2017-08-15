@@ -54,7 +54,7 @@ class TestSetup(object):
 class TestCRUD(object):
 
 
-	def test_create_collection(self):
+	def test_create_pcdm_collection(self):
 
 		# create resource
 		pcdm_col = PCDMCollection(repo, '%s/pcdm_col' % testing_container_uri)
@@ -70,7 +70,16 @@ class TestCRUD(object):
 		assert isinstance(pcdm_col, BasicContainer)
 
 
-	def test_create_object(self):
+	def test_retrieve_pcdm_collection(self):
+
+		# retrieve resource
+		pcdm_col = repo.get_resource('%s/pcdm_col' % testing_container_uri, resource_type=PCDMCollection)
+
+		# assert PCDM Collection
+		assert type(pcdm_col) == PCDMCollection
+
+
+	def test_create_pcdm_object(self):
 
 		# create resource
 		pcdm_obj = PCDMObject(repo, '%s/pcdm_obj' % testing_container_uri)
@@ -84,6 +93,15 @@ class TestCRUD(object):
 
 		# assert extending BasicContainer
 		assert isinstance(pcdm_obj, BasicContainer)
+
+
+	def test_retrieve_pcdm_object(self):
+
+		# retrieve resource
+		pcdm_obj = repo.get_resource('%s/pcdm_obj' % testing_container_uri, resource_type=PCDMObject)
+
+		# assert PCDM Collection
+		assert type(pcdm_obj) == PCDMObject
 
 
 
