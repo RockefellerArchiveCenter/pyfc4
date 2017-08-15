@@ -54,7 +54,8 @@ class Repository(object):
 		'fedoraconfig':'http://fedora.info/definitions/v4/config#',
 		'foaf':'http://xmlns.com/foaf/0.1/',
 		'dc':'http://purl.org/dc/elements/1.1/',
-		'pcdm':'http://pcdm.org/models#'
+		'pcdm':'http://pcdm.org/models#',
+		'ore':'http://www.openarchives.org/ore/terms/'
 	}
 
 	def __init__(self, 

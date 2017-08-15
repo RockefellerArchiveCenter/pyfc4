@@ -45,10 +45,27 @@ class PCDMCollection(_models.BasicContainer):
 
 		'''
 		resource.create() hook
+
+		For PCDM Collections, post creation, also create 
 		'''
 
-		logger.debug('no additional actions for PCDM Collection')
-		return True
+		# create /members child resource
+		members_child = PCDMMembersContainer(
+			self.repo,
+			'%s/members' % self.uri_as_string(),
+			membershipResource=self.uri,
+			hasMemberRelation=self.rdf.prefixes.pcdm.hasMember,
+			insertedContentRelation=self.rdf.prefixes.ore.proxyFor)
+		members_child.create(specify_uri=True)
+
+		# create /related child resource
+		related_child = PCDMRelatedContainer(
+			self.repo,
+			'%s/related' % self.uri_as_string(),
+			membershipResource=self.uri,
+			hasMemberRelation=self.rdf.prefixes.ore.aggregates,
+			insertedContentRelation=self.rdf.prefixes.ore.proxyFor)
+		related_child.create(specify_uri=True)
 
 
 
@@ -91,7 +108,7 @@ class PCDMObject(_models.BasicContainer):
 		'''
 
 		# create /files child resource
-		files_child = PCDMObjectFiles(
+		files_child = PCDMFilesContainer(
 			self.repo,
 			'%s/files' % self.uri_as_string(),
 			membershipResource=self.uri,
@@ -99,15 +116,47 @@ class PCDMObject(_models.BasicContainer):
 		files_child.create(specify_uri=True)
 
 		# create /members child resource
+		members_child = PCDMMembersContainer(
+			self.repo,
+			'%s/members' % self.uri_as_string(),
+			membershipResource=self.uri,
+			hasMemberRelation=self.rdf.prefixes.pcdm.hasMember,
+			insertedContentRelation=self.rdf.prefixes.ore.proxyFor)
+		members_child.create(specify_uri=True)
+
 		# create /related child resource
+		related_child = PCDMRelatedContainer(
+			self.repo,
+			'%s/related' % self.uri_as_string(),
+			membershipResource=self.uri,
+			hasMemberRelation=self.rdf.prefixes.ore.aggregates,
+			insertedContentRelation=self.rdf.prefixes.ore.proxyFor)
+		related_child.create(specify_uri=True)
+
 		# create /associated child resource
+		associated_child = PCDMAssociatedContainer(
+			self.repo,
+			'%s/associated' % self.uri_as_string(),
+			membershipResource=self.uri,
+			hasMemberRelation=self.rdf.prefixes.pcdm.hasRelatedFile)
+		associated_child.create(specify_uri=True)
 
 
 
-class PCDMObjectFiles(_models.DirectContainer):
+class PCDMFilesContainer(_models.DirectContainer):
 
 	'''
 	Class to represent Files under a PCDM Object
+
+	Inherits:
+		DirectContainer
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		membershipResource (rdflib.term): resource that will accumlate triples as children are added
+		hasMemberRelation (rdflib.term): predicate that will be used when pointing from URI in ldp:membershipResource to ldp:insertedContentRelation
 	'''
 
 	def __init__(self,
@@ -117,19 +166,13 @@ class PCDMObjectFiles(_models.DirectContainer):
 		membershipResource=None,
 		hasMemberRelation=None):
 
-		# fire parent Container init()
-		super().__init__(repo, uri=uri, response=response)
-
-		# if resource does not yet exist, set rdf:type
-		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
-
-		# save membershipResource, hasMemberRelation		
-		self.membershipResource = membershipResource
-		self.hasMemberRelation = hasMemberRelation
-
-		# writemembershipResource or hasMemberRelation relationships
-		self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
-		self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
+		# fire parent DirectContainer init()
+		super().__init__(
+			repo,
+			uri=uri,
+			response=response,
+			membershipResource=membershipResource,
+			hasMemberRelation=hasMemberRelation)
 
 
 	def _post_create(self):
@@ -138,5 +181,157 @@ class PCDMObjectFiles(_models.DirectContainer):
 		resource.create() hook
 		'''
 
-		logger.debug('no additional actions for PCDM Object Files')
+		logger.debug('no additional create actions')
 		return True
+
+
+
+class PCDMMembersContainer(_models.IndirectContainer):
+
+	'''
+	Class to represent Related under a PCDM Collection or Object
+
+
+	Inherits:
+		IndirectContainer
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		membershipResource (rdflib.term): resource that will accumlate triples as children are added
+		hasMemberRelation (rdflib.term): predicate that will be used when pointing from URI in ldp:membershipResource to ldp:insertedContentRelation
+		insertedContentRelation (rdflib.term): destination for ldp:hasMemberRelation from ldp:membershipResource
+	'''
+
+	def __init__(self,
+		repo,
+		uri=None,
+		response=None,
+		membershipResource=None,
+		hasMemberRelation=None,
+		insertedContentRelation=None):
+
+		# fire parent Container init()
+		super().__init__(
+			repo,
+			uri=uri,
+			response=response,
+			membershipResource=membershipResource,
+			hasMemberRelation=hasMemberRelation,
+			insertedContentRelation=insertedContentRelation)
+
+
+	def _post_create(self):
+
+		'''
+		resource.create() hook
+		'''
+
+		logger.debug('no additional create actions')
+		return True
+
+
+
+class PCDMRelatedContainer(_models.IndirectContainer):
+
+	'''
+	Class to represent Related under a PCDM Collection or Object
+
+
+	Inherits:
+		IndirectContainer
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		membershipResource (rdflib.term): resource that will accumlate triples as children are added
+		hasMemberRelation (rdflib.term): predicate that will be used when pointing from URI in ldp:membershipResource to ldp:insertedContentRelation
+		insertedContentRelation (rdflib.term): destination for ldp:hasMemberRelation from ldp:membershipResource
+	'''
+
+	def __init__(self,
+		repo,
+		uri=None,
+		response=None,
+		membershipResource=None,
+		hasMemberRelation=None,
+		insertedContentRelation=None):
+
+		# fire parent Container init()
+		super().__init__(
+			repo,
+			uri=uri,
+			response=response,
+			membershipResource=membershipResource,
+			hasMemberRelation=hasMemberRelation,
+			insertedContentRelation=insertedContentRelation)
+
+
+	def _post_create(self):
+
+		'''
+		resource.create() hook
+		'''
+
+		logger.debug('no additional create actions')
+		return True
+
+
+
+class PCDMAssociatedContainer(_models.IndirectContainer):
+
+	'''
+	Class to represent Associated under a PCDM Object
+
+
+	Inherits:
+		IndirectContainer
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		membershipResource (rdflib.term): resource that will accumlate triples as children are added
+		hasMemberRelation (rdflib.term): predicate that will be used when pointing from URI in ldp:membershipResource to ldp:insertedContentRelation
+		insertedContentRelation (rdflib.term): destination for ldp:hasMemberRelation from ldp:membershipResource
+	'''
+
+	def __init__(self,
+		repo,
+		uri=None,
+		response=None,
+		membershipResource=None,
+		hasMemberRelation=None,
+		insertedContentRelation=None):
+
+		# fire parent Container init()
+		super().__init__(
+			repo,
+			uri=uri,
+			response=response,
+			membershipResource=membershipResource,
+			hasMemberRelation=hasMemberRelation,
+			insertedContentRelation=insertedContentRelation)
+
+
+	def _post_create(self):
+
+		'''
+		resource.create() hook
+		'''
+
+		logger.debug('no additional create actions')
+		return True
+
+
+
+
+
+
+
+
+
+
+
