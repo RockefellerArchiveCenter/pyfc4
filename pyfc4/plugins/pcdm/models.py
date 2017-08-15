@@ -30,6 +30,9 @@ class PCDMCollection(_models.BasicContainer):
 	/collections/{id}/related/{prxid}	--	 Proxy for the related Object
 	----------------------------------------------------------------------------------
 
+	When a PCDMCollection is created, the following child resources are automatically created:
+		- /members
+		- /related
 	'''
 
 	def __init__(self, repo, uri=None, response=None):
@@ -48,6 +51,7 @@ class PCDMCollection(_models.BasicContainer):
 		return True
 
 
+
 class PCDMObject(_models.BasicContainer):
 
 	'''
@@ -55,7 +59,7 @@ class PCDMObject(_models.BasicContainer):
 
 	----------------------------------------------------------------------------------
 	URI Template	--	Resource Identified
-	-----------------------------------------------------------------------------
+	----------------------------------------------------------------------------------
 	/objects/{id}	--	An Object
 	/objects/{id}/files/	--	Container for component Files of the Object
 	/objects/{id}/files/{bsid}	--	A component File
@@ -66,6 +70,12 @@ class PCDMObject(_models.BasicContainer):
 	/objects/{id}/related/{prxid}	--	Proxy for the related Object
 	/objects/{id}/associated/	--	Container for associated Files
 	----------------------------------------------------------------------------------
+
+	When a PCDMObject is created, the following child resources are automatically created:
+		- /files
+		- /members
+		- /related
+		- /associated
 	'''
 
 	def __init__(self, repo, uri=None, response=None):
@@ -85,64 +95,24 @@ class PCDMObject(_models.BasicContainer):
 
 
 
-# class Object(models.BasicContainer):
+# class PCDMObjectFiles(_models.BasicContainer):
 
 # 	'''
-	
+# 	Class to represent PCDM Collections in LDP.
+
 # 	'''
 
-# 	def __init__(self,
-# 		repo,
-# 		parent_object,
-# 		uri=None,
-# 		response=None,
-# 		membershipResource=None,
-# 		hasMemberRelation=None):
+# 	def __init__(self, repo, uri=None, response=None):
 
 # 		# fire parent Container init()
 # 		super().__init__(repo, uri=uri, response=response)
 
-# 		# if resource does not yet exist, set rdf:type
-# 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
 
-# 		# save membershipResource, hasMemberRelation		
-# 		self.membershipResource = membershipResource
-# 		self.hasMemberRelation = hasMemberRelation
+# 	def _post_create(self):
 
-# 		# if membershipResource or hasMemberRelation args are set, set triples
-# 		if membershipResource:
-# 			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
-# 		if hasMemberRelation:
-# 			self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
+# 		'''
+# 		resource.create() hook
+# 		'''
 
-
-
-# class PCDM_Files(models.DirectContainer):
-
-# 	'''
-
-# 	'''
-
-# 	def __init__(self,
-# 		repo,
-# 		parent_object,
-# 		uri=None,
-# 		response=None,
-# 		membershipResource=None,
-# 		hasMemberRelation=None):
-
-# 		# fire parent Container init()
-# 		super().__init__(repo, uri=uri, response=response)
-
-# 		# if resource does not yet exist, set rdf:type
-# 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
-
-# 		# save membershipResource, hasMemberRelation		
-# 		self.membershipResource = membershipResource
-# 		self.hasMemberRelation = hasMemberRelation
-
-# 		# if membershipResource or hasMemberRelation args are set, set triples
-# 		if membershipResource:
-# 			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
-# 		if hasMemberRelation:
-# 			self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
+# 		logger.debug('no additional actions for PCDM Object')
+# 		return True
