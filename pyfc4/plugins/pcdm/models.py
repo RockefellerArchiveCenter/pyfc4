@@ -90,29 +90,53 @@ class PCDMObject(_models.BasicContainer):
 		resource.create() hook
 		'''
 
-		logger.debug('no additional actions for PCDM Object')
+		# create /files child resource
+		files_child = PCDMObjectFiles(
+			self.repo,
+			'%s/files' % self.uri_as_string(),
+			membershipResource=self.uri,
+			hasMemberRelation=self.rdf.prefixes.pcdm.hasFile)
+		files_child.create(specify_uri=True)
+
+		# create /members child resource
+		# create /related child resource
+		# create /associated child resource
+
+
+
+class PCDMObjectFiles(_models.DirectContainer):
+
+	'''
+	Class to represent Files under a PCDM Object
+	'''
+
+	def __init__(self,
+		repo,
+		uri=None,
+		response=None,
+		membershipResource=None,
+		hasMemberRelation=None):
+
+		# fire parent Container init()
+		super().__init__(repo, uri=uri, response=response)
+
+		# if resource does not yet exist, set rdf:type
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
+
+		# save membershipResource, hasMemberRelation		
+		self.membershipResource = membershipResource
+		self.hasMemberRelation = hasMemberRelation
+
+		# writemembershipResource or hasMemberRelation relationships
+		self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
+		self.add_triple(self.rdf.prefixes.ldp.hasMemberRelation, hasMemberRelation)
+
+
+	def _post_create(self):
+
+		'''
+		resource.create() hook
+		'''
+
+		logger.debug('no additional actions for PCDM Object Files')
 		return True
-
-
-
-# class PCDMObjectFiles(_models.BasicContainer):
-
-# 	'''
-# 	Class to represent PCDM Collections in LDP.
-
-# 	'''
-
-# 	def __init__(self, repo, uri=None, response=None):
-
-# 		# fire parent Container init()
-# 		super().__init__(repo, uri=uri, response=response)
-
-
-# 	def _post_create(self):
-
-# 		'''
-# 		resource.create() hook
-# 		'''
-
-# 		logger.debug('no additional actions for PCDM Object')
-# 		return True
