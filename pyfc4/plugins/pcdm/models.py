@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 '''
-Implementation of PCDM in LDP.
+Implementation of PCDM in LDP:
 https://docs.google.com/document/d/1RI8aX8XQEk-30-Ht-DaPF5nz_VtI1-eqxUuDvF3nhv0/edit#
 '''
 
@@ -66,6 +66,13 @@ class PCDMCollection(_models.BasicContainer):
 			hasMemberRelation=self.rdf.prefixes.ore.aggregates,
 			insertedContentRelation=self.rdf.prefixes.ore.proxyFor)
 		related_child.create(specify_uri=True)
+
+
+	def delete(self):
+
+		'''
+		overrides BasicContainer .delete, removing all associated resources
+		'''
 
 
 
@@ -140,6 +147,13 @@ class PCDMObject(_models.BasicContainer):
 			membershipResource=self.uri,
 			hasMemberRelation=self.rdf.prefixes.pcdm.hasRelatedFile)
 		associated_child.create(specify_uri=True)
+
+
+	def delete(self):
+
+		'''
+		overrides BasicContainer .delete, removing all associated resources
+		'''
 
 
 

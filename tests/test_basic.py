@@ -512,7 +512,12 @@ class TestIndirectContainer(object):
 		foo = repo.get_resource('%s/foo' % testing_container_uri)
 
 		# create IndirectContainer that sets a foaf:based_near relationship from goober to foo
-		ding = IndirectContainer(repo,'%s/ding' % testing_container_uri, membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.based_near, insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
+		ding = IndirectContainer(
+			repo,
+			'%s/ding' % testing_container_uri,
+			membershipResource=goober.uri,
+			hasMemberRelation=goober.rdf.prefixes.foaf.based_near,
+			insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
 		ding.create(specify_uri=True)
 		assert ding.exists
 
