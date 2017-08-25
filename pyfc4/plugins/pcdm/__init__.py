@@ -42,9 +42,10 @@ def create_pcdm_demo_resources(repo):
 
 	# create proxy object at /collections/poe/members that points to /objects/raven
 	ravenproxy = models.PCDMObject(repo, 'pcdmdemo/collections/poe/members/ravenproxy')
+	ravenproxy.create(specify_uri=True, auto_refresh=True)
 	ravenproxy.add_triple(ravenproxy.rdf.prefixes.rdf.type, ravenproxy.rdf.prefixes.ore.Proxy)
 	ravenproxy.add_triple(ravenproxy.rdf.prefixes.ore.proxyFor, raven.uri)
-	ravenproxy.create(specify_uri=True, auto_refresh=False)
+	ravenproxy.update()
 
 	# create PCDM object for page 1
 	ravenpage1 = models.PCDMObject(repo,'pcdmdemo/objects/ravenpage1')
@@ -58,10 +59,12 @@ def create_pcdm_demo_resources(repo):
 
 	# create proxy object at /raven/members that points to /objects/ravenpage1
 	ravenpage1proxy = models.PCDMObject(repo, 'pcdmdemo/objects/raven/members/ravenpage1proxy')
+	ravenpage1proxy.create(specify_uri=True, auto_refresh=True)
 	ravenpage1proxy.add_triple(ravenpage1proxy.rdf.prefixes.rdf.type, ravenpage1proxy.rdf.prefixes.ore.Proxy)
 	ravenpage1proxy.add_triple(ravenpage1proxy.rdf.prefixes.ore.proxyFor, ravenpage1.uri)
 	ravenpage1proxy.add_triple(ravenpage1proxy.rdf.prefixes.ore.proxyIn, raven.uri)
-	ravenpage1proxy.create(specify_uri=True, auto_refresh=False)
+	ravenpage1proxy.update()
+	
 
 	# create PCDM object for page 2
 	ravenpage2 = models.PCDMObject(repo,'pcdmdemo/objects/ravenpage2')
@@ -75,11 +78,11 @@ def create_pcdm_demo_resources(repo):
 
 	# create proxy object at /raven/members that points to /objects/ravenpage1
 	ravenpage2proxy = models.PCDMObject(repo, 'pcdmdemo/objects/raven/members/ravenpage2proxy')
+	ravenpage2proxy.create(specify_uri=True, auto_refresh=True)
 	ravenpage2proxy.add_triple(ravenpage2proxy.rdf.prefixes.rdf.type, ravenpage2proxy.rdf.prefixes.ore.Proxy)
 	ravenpage2proxy.add_triple(ravenpage2proxy.rdf.prefixes.ore.proxyFor, ravenpage2.uri)
 	ravenpage2proxy.add_triple(ravenpage2proxy.rdf.prefixes.ore.proxyIn, raven.uri)
-	ravenpage2proxy.create(specify_uri=True, auto_refresh=False)
-
+	ravenpage2proxy.update()
 
 
 
