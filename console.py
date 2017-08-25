@@ -26,7 +26,8 @@ repo = Repository(
 	REPO_ROOT,
 	REPO_USERNAME,
 	REPO_PASSWORD,
-	context={'foo':'http://foo.com/ontology/','bar':'http://bar.org#'})
+	context={'foo':'http://foo.com/ontology/','bar':'http://bar.org#'},
+	default_serialization='text/turtle')
 
 fast_repo = Repository(
 	REPO_ROOT,
