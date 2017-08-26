@@ -53,7 +53,9 @@ class Repository(object):
 		'xs':'http://www.w3.org/2001/XMLSchema',
 		'fedoraconfig':'http://fedora.info/definitions/v4/config#',
 		'foaf':'http://xmlns.com/foaf/0.1/',
-		'dc':'http://purl.org/dc/elements/1.1/'
+		'dc':'http://purl.org/dc/elements/1.1/',
+		'pcdm':'http://pcdm.org/models#',
+		'ore':'http://www.openarchives.org/ore/terms/'
 	}
 
 	def __init__(self, 
@@ -80,6 +82,11 @@ class Repository(object):
 
 		# API facade
 		self.api = API(self)
+
+		# instantiate namespace_manager
+		self.namespace_manager = rdflib.namespace.NamespaceManager(rdflib.Graph())
+		for ns_prefix, ns_uri in self.context.items():
+			self.namespace_manager.bind(ns_prefix, ns_uri, override=False)
 
 		# if context provided, merge with defaults
 		if context:
@@ -147,7 +154,7 @@ class Repository(object):
 			raise TypeError("expecting Resource type, such as BasicContainer or NonRDFSource")
 
 
-	def get_resource(self, uri, response_format=None):
+	def get_resource(self, uri, resource_type=None, response_format=None):
 
 		'''
 		return appropriate Resource-type instance
@@ -156,6 +163,7 @@ class Repository(object):
 
 		Args:
 			uri (rdflib.term.URIRef,str): input URI
+			resource_type (): resource class e.g. BasicContainer, NonRDFSource, or extensions thereof
 			response_format (str): expects mimetype / Content-Type header such as 'application/rdf+xml', 'text/turtle', etc.
 
 		Returns:
@@ -180,8 +188,10 @@ class Repository(object):
 		# assume exists, parse headers for resource type and return instance
 		elif head_response.status_code == 200:
 
-			# parse LDP resource type from headers
-			resource_type = self.api.parse_resource_type(head_response)
+			# if resource_type not provided
+			if not resource_type:
+				# parse LDP resource type from headers
+				resource_type = self.api.parse_resource_type(head_response)
 			logger.debug('using resource type: %s' % resource_type)
 
 			# fire GET request
@@ -515,6 +525,8 @@ class API(object):
 		'''
 		parse resource type from self.http_request()
 
+		Note: uses isinstance() as plugins may extend these base LDP resource type.
+
 		Args:
 			response (requests.models.Response): response object
 
@@ -524,23 +536,29 @@ class API(object):
 		
 		# parse 'Link' header
 		links = [
-			link.split(";")[0]
+			link.split(";")[0].lstrip('<').rstrip('>')
 			for link in response.headers['Link'].split(', ')
 			if link.startswith('<http://www.w3.org/ns/ldp#')]
-		logger.debug('parsed Link headers: %s' % links)
-		
+
+		# parse resource type string with self.repo.namespace_manager.compute_qname()
+		ldp_resource_types = [
+			self.repo.namespace_manager.compute_qname(resource_type)[2]
+			for resource_type in links]
+
+		logger.debug('Parsed LDP resource types from LINK header: %s' % ldp_resource_types)
+
 		# with LDP types in hand, select appropriate resource type
 		# NonRDF Source
-		if '<http://www.w3.org/ns/ldp#NonRDFSource>' in links:
+		if 'NonRDFSource' in ldp_resource_types:
 			return NonRDFSource
 		# Basic Container
-		elif '<http://www.w3.org/ns/ldp#BasicContainer>' in links:
+		elif 'BasicContainer' in ldp_resource_types:
 			return BasicContainer
 		# Direct Container
-		elif '<http://www.w3.org/ns/ldp#DirectContainer>' in links:
+		elif 'DirectContainer' in ldp_resource_types:
 			return DirectContainer
 		# Indirect Container
-		elif '<http://www.w3.org/ns/ldp#IndirectContainer>' in links:
+		elif 'IndirectContainer' in ldp_resource_types:
 			return IndirectContainer
 		else:
 			logger.debug('could not determine resource type from Link header, returning False')
@@ -842,6 +860,9 @@ class Resource(object):
 			elif auto_refresh == None:
 				if self.repo.default_auto_refresh:
 					self.refresh()
+			# fire resource._post_create hook if exists
+			if hasattr(self,'_post_create'):
+				self._post_create()
 
 		# 404, assumed POST, target location does not exist
 		elif response.status_code == 404:
@@ -988,7 +1009,7 @@ class Resource(object):
 		updated_self = self.repo.get_resource(self.uri)
 
 		# if resource type of updated_self != self, raise exception
-		if type(updated_self) != type(self):
+		if not isinstance(self, type(updated_self)):
 			raise Exception('Instantiated %s, but repository reports this resource is %s' % (type(updated_self), type(self)) )
 
 		if updated_self:
@@ -1949,6 +1970,10 @@ class DirectContainer(Container):
 		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.DirectContainer)
 
+		# save membershipResource, hasMemberRelation		
+		self.membershipResource = membershipResource
+		self.hasMemberRelation = hasMemberRelation
+
 		# if membershipResource or hasMemberRelation args are set, set triples
 		if membershipResource:
 			self.add_triple(self.rdf.prefixes.ldp.membershipResource, membershipResource)
@@ -1990,6 +2015,11 @@ class IndirectContainer(Container):
 	
 		# if resource does not yet exist, set rdf:type
 		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ldp.IndirectContainer)
+
+		# save membershipResource, hasMemberRelation		
+		self.membershipResource = membershipResource
+		self.hasMemberRelation = hasMemberRelation
+		self.insertedContentRelation = insertedContentRelation
 
 		# if membershipResource, hasMemberRelation, or insertedContentRelation args are set, set triples
 		if membershipResource:

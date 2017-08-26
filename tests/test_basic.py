@@ -191,22 +191,6 @@ class TestBasicCRUDPUT(object):
 		assert final_string == 'this is a test, this is only a test'
 
 
-	# create BasicContainer with NonRDFSource attributes, expect exception
-	def create_resource_type_mismatch(self):
-		
-		'''
-		When creating a resource, the resource runs .refresh(), which returns the
-		resource type that the repo purports it is.  If this does not match the original
-		resource type of the object that was used to create (e.g. instantiate BasicContainer,
-		but repo comes back and says resource is NonRDFSource), this needs to raise an exception.
-		'''
-
-		goober = BasicContainer(repo, '%s/foo/goober' % testing_container_uri)
-		goober.data = 'this is a test, this is only a test'
-		goober.headers['Content-Type'] = 'text/plain'
-		goober.create(specify_uri=True)
-
-
 	# test alternate response formats for resource get
 	def test_alternate_formats(self):
 
@@ -224,6 +208,22 @@ class TestBasicCRUDPUT(object):
 		response = repo.api.http_request('GET', foo.uri, data=None, headers=None, response_format='text/turtle')
 		assert foo.headers['Content-Type'].startswith('text/turtle')
 
+	# test resource detection
+	def test_resource_type(self):
+
+		# detect basic container
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
+		assert type(foo) == BasicContainer
+
+		# pass resource type
+		foo = repo.get_resource('%s/foo' % testing_container_uri, resource_type=BasicContainer)
+		assert type(foo) == BasicContainer
+
+		# assert resource is opened with incompatible resource type, detected on refresh
+		foo = repo.get_resource('%s/foo' % testing_container_uri, resource_type=DirectContainer)
+		with pytest.raises(Exception) as excinfo:
+			foo.refresh()
+		assert 'but repository reports this resource is' in str(excinfo.value)
 
 
 class TestURIParsing(object):
@@ -512,7 +512,12 @@ class TestIndirectContainer(object):
 		foo = repo.get_resource('%s/foo' % testing_container_uri)
 
 		# create IndirectContainer that sets a foaf:based_near relationship from goober to foo
-		ding = IndirectContainer(repo,'%s/ding' % testing_container_uri, membershipResource=goober.uri, hasMemberRelation=goober.rdf.prefixes.foaf.based_near, insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
+		ding = IndirectContainer(
+			repo,
+			'%s/ding' % testing_container_uri,
+			membershipResource=goober.uri,
+			hasMemberRelation=goober.rdf.prefixes.foaf.based_near,
+			insertedContentRelation=goober.rdf.prefixes.foaf.based_near)
 		ding.create(specify_uri=True)
 		assert ding.exists
 
