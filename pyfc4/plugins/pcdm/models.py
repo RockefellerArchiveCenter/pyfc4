@@ -14,9 +14,10 @@ https://docs.google.com/document/d/1RI8aX8XQEk-30-Ht-DaPF5nz_VtI1-eqxUuDvF3nhv0/
 '''
 
 
-# configurations to be handled later (no trailing slash)
-pcdm_objects_path = 'objects'
-pcdm_collections_path = 'collections'
+# configurations
+# TODO: https://github.com/ghukill/pyfc4/issues/76
+objects_path = 'objects'
+collections_path = 'collections'
 
 
 class PCDMCollection(_models.BasicContainer):
@@ -47,7 +48,7 @@ class PCDMCollection(_models.BasicContainer):
 	def __init__(self, repo, uri='', response=None):
 
 		# fire parent Container init()
-		super().__init__(repo, uri="%s/%s" % (pcdm_collections_path, uri), response=response)
+		super().__init__(repo, uri="%s/%s" % (collections_path, uri), response=response)
 
 
 	def _post_create(self):
@@ -84,10 +85,10 @@ class PCDMCollection(_models.BasicContainer):
 	# 	'''
 
 
-	def create_child_object(self, uri='', specify_uri=False):
+	def create_member_object(self, uri='', specify_uri=False):
 
 		'''
-		create child object for this collection
+		create member object for this collection
 			- create PCDMObject at /objects/raven
 			- create children /files, /members, /related, /associated
 			- create proxy obect at /collections/poe/members/raven_proxy (if uri provided), with the following triples:
@@ -98,13 +99,14 @@ class PCDMCollection(_models.BasicContainer):
 
 		Args:
 			uri: optional uri for child object (should not start with trailing slash)
+			specify_uri: if True, issue PUT and create URI, if False, issue POST and get repository minted URI
 
 		Returns:
 			PCDMObject
 		'''
 
 		# instantiate and create PCDMObject
-		obj = PCDMObject(self.repo, uri="%s/%s" % (pcdm_objects_path, uri))
+		obj = PCDMObject(self.repo, uri="%s/%s" % (objects_path, uri))
 		obj.create(specify_uri=specify_uri)
 
 		# create proxy object with proxyFor prdicate
@@ -201,10 +203,10 @@ class PCDMObject(_models.BasicContainer):
 	# 	'''
 
 
-	def create_child_object(self, uri='', specify_uri=False):
+	def create_member_object(self, uri='', specify_uri=False):
 
 		'''
-		create child object for this object
+		create member object for this object
 			- create PCDMObject at /objects/page1 (good example where naming URIs is not ideal...)
 			- create normal PCDMObject children /files, /members, /related, /associated
 			- create proxy object at /objects/raven/members/page1_proxy with triples:
@@ -222,7 +224,7 @@ class PCDMObject(_models.BasicContainer):
 		'''
 
 		# instantiate and create PCDMObject
-		obj = PCDMObject(self.repo, uri="%s/%s" % (pcdm_objects_path, uri))
+		obj = PCDMObject(self.repo, uri="%s/%s" % (objects_path, uri))
 		obj.create(specify_uri=specify_uri)
 
 		# create proxy object with proxyFor and proxyIn predicates
@@ -243,13 +245,63 @@ class PCDMObject(_models.BasicContainer):
 
 		Args:
 			uri: optional uri for child object (should not start with trailing slash)
+			data: optional data for binary resource
+			mimetype: mimetype for binary resource
 
 		Returns:
-			PCDMObject
+			Binary
 		'''
 
 		# instantiate and create PCDMBinary
 		binary = _models.Binary(self.repo, uri="%s/files/%s" % (self.uri, uri))
+
+		# if data and/or mimetype provided, set
+		if data:
+			binary.binary.data = data
+		if mimetype:
+			binary.binary.mimetype = mimetype
+
+		# create and return
+		binary.create(specify_uri=specify_uri)
+		return binary
+
+
+	def create_related_proxy_object(self, proxyForURI, uri='', specify_uri=False):
+
+		'''
+		Create related proxy object in self.uri/related.
+		Creates ore:aggregates for this object
+
+		Args:
+			proxyForURI: required, resource that ore:proxyFor points to
+			uri: optional uri for proxy object (should not start with trailing slash)
+			specify_uri: if True, issue PUT and create URI, if False, issue POST and get repository minted URI
+		'''
+
+		# create proxy object with proxyFor and proxyIn predicates
+		proxy_obj = PCDMProxyObject(self.repo, uri="%s/related/%s" % (self.uri, uri), proxyForURI=proxyForURI)
+		proxy_obj.create(specify_uri=specify_uri)
+
+
+	def create_associated_file(self, uri='', specify_uri=False, data=None, mimetype=None):
+
+		'''
+		add file to PCDMObject at /associated
+			- create NonRDFSource at /objects/page1/associated/fits
+			- because /associated is DirectContainer, would create following triples:
+				- page1.uri --> pcdm.hasRelatedFile --> fits.uri
+
+		Args:
+			uri: optional uri for child object (should not start with trailing slash)
+			data: optional data for binary resource
+			mimetype: mimetype for binary resource
+
+		Returns:
+			Binary
+		'''
+
+		# instantiate and create PCDMBinary
+		binary = _models.Binary(self.repo, uri="%s/associated/%s" % (self.uri, uri))
 
 		# if data and/or mimetype provided, set
 		if data:
@@ -451,14 +503,14 @@ class PCDMRelatedContainer(_models.IndirectContainer):
 
 
 
-class PCDMAssociatedContainer(_models.IndirectContainer):
+class PCDMAssociatedContainer(_models.DirectContainer):
 
 	'''
 	Class to represent Associated under a PCDM Object
 
 
 	Inherits:
-		IndirectContainer
+		DirectContainer
 
 	Args:
 		repo (Repository): instance of Repository class
@@ -466,7 +518,6 @@ class PCDMAssociatedContainer(_models.IndirectContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 		membershipResource (rdflib.term): resource that will accumlate triples as children are added
 		hasMemberRelation (rdflib.term): predicate that will be used when pointing from URI in ldp:membershipResource to ldp:insertedContentRelation
-		insertedContentRelation (rdflib.term): destination for ldp:hasMemberRelation from ldp:membershipResource
 	'''
 
 	def __init__(self,
@@ -474,17 +525,15 @@ class PCDMAssociatedContainer(_models.IndirectContainer):
 		uri=None,
 		response=None,
 		membershipResource=None,
-		hasMemberRelation=None,
-		insertedContentRelation=None):
+		hasMemberRelation=None):
 
-		# fire parent Container init()
+		# fire parent DirectContainer init()
 		super().__init__(
 			repo,
 			uri=uri,
 			response=response,
 			membershipResource=membershipResource,
-			hasMemberRelation=hasMemberRelation,
-			insertedContentRelation=insertedContentRelation)
+			hasMemberRelation=hasMemberRelation)
 
 
 	def _post_create(self):

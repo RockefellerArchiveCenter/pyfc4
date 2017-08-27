@@ -7,13 +7,13 @@ from pyfc4 import models as _models
 from pyfc4.plugins.pcdm import models
 
 
-# convenience function for creating example structure
+# function to create handful of PCDM related objects
 def create_pcdm_demo_resources(repo):
 
 	# create root objcts /collections and /objects
-	collections = _models.BasicContainer(repo, 'collections')
+	collections = _models.BasicContainer(repo, models.collections_path)
 	collections.create(specify_uri=True)
-	objects = _models.BasicContainer(repo, 'objects')
+	objects = _models.BasicContainer(repo, models.objects_path)
 	objects.create(specify_uri=True)
 
 	# create sample colors collection
@@ -21,32 +21,40 @@ def create_pcdm_demo_resources(repo):
 	colors.create(specify_uri=True)
 
 	# create sample objects
-	red = colors.create_child_object('red', specify_uri=True)
-	green = colors.create_child_object('green', specify_uri=True)
-	blue = colors.create_child_object('blue', specify_uri=True)
+	red = colors.create_member_object('red', specify_uri=True)
+	green = colors.create_member_object('green', specify_uri=True)
+	blue = colors.create_member_object('blue', specify_uri=True)
 
-	# create child to green
-	lime = green.create_child_object('lime', specify_uri=True)
+	# create children to green
+	lime = green.create_member_object('lime', specify_uri=True)
+	chartreuse = green.create_member_object('chartreuse', specify_uri=True)
 
 	# create poem for lime green
 	poem = lime.create_file('poem', specify_uri=True, data='you\'ve always been\ngood to me lime green', mimetype='text/plain')
+
+	# create related proxy object for lime
+	lime.create_related_proxy_object(chartreuse.uri,'chartreuse',specify_uri=True)
+
+	# create associated spectrum file for lime
+	lime.create_associated_file('spectrum',data='570nm',mimetype='text/plain',specify_uri=True)
 
 	# create collectoin without uri
 	generic_collection = models.PCDMCollection(repo)
 	generic_collection.create()
 
 	# create generic children
-	generic_child1 = generic_collection.create_child_object()
-	generic_child2 = generic_collection.create_child_object()
-	generic_child3 = generic_collection.create_child_object()
+	generic_child1 = generic_collection.create_member_object()
+	generic_child2 = generic_collection.create_member_object()
+	generic_child3 = generic_collection.create_member_object()
 
 	# create generic child to child1
-	generic_childA = generic_child1.create_child_object()
+	generic_childA = generic_child1.create_member_object()
 
 	# create file for generic_childA
 	generic_file = generic_childA.create_file(data='We\'re in Delaware.', mimetype='text/plain')
 
 
+# function to delete /collections and /objects
 def delete_pcdm_demo_resources(repo):
 
 	'''
