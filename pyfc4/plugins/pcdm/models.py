@@ -87,7 +87,7 @@ class PCDMCollection(_models.BasicContainer):
 	def create_child_object(self, uri='', specify_uri=False):
 
 		'''
-		create child object to collection
+		create child object for this collection
 			- create PCDMObject at /objects/raven
 			- create children /files, /members, /related, /associated
 			- create proxy obect at /collections/poe/members/raven_proxy (if uri provided), with the following triples:
@@ -107,16 +107,12 @@ class PCDMCollection(_models.BasicContainer):
 		obj = PCDMObject(self.repo, uri="%s/%s" % (pcdm_objects_path, uri))
 		obj.create(specify_uri=specify_uri)
 
-		# create proxy object
-		# proxy_obj = PCDMObject(self.repo, uri="%s/members/%s" % (self.uri, uri))
-		# proxy_obj.create(specify_uri=specify_uri)
-		# proxy_obj.add_triple(proxy_obj.rdf.prefixes.rdf.type, proxy_obj.rdf.prefixes.ore.Proxy)
-		# proxy_obj.add_triple(proxy_obj.rdf.prefixes.ore.proxyFor, obj.uri)
-		# proxy_obj.update()
-
-		# create proxy object
+		# create proxy object with proxyFor prdicate
 		proxy_obj = PCDMProxyObject(self.repo, uri="%s/members/%s" % (self.uri, uri), proxyForURI=obj.uri)
 		proxy_obj.create(specify_uri=specify_uri)
+
+		# return
+		return obj
 
 
 
@@ -205,6 +201,67 @@ class PCDMObject(_models.BasicContainer):
 	# 	'''
 
 
+	def create_child_object(self, uri='', specify_uri=False):
+
+		'''
+		create child object for this object
+			- create PCDMObject at /objects/page1 (good example where naming URIs is not ideal...)
+			- create normal PCDMObject children /files, /members, /related, /associated
+			- create proxy object at /objects/raven/members/page1_proxy with triples:
+				- rdf.type --> ore.Proxy
+				- ore.proxyFor --> page1.uri
+				- ore.proxyIn --> raven.uri
+			- because /members is IndirectContainer, would create triples:
+				- raven.uri --> pcdm.hasMember --> page1.uri
+
+		Args:
+			uri: optional uri for child object (should not start with trailing slash)
+
+		Returns:
+			PCDMObject
+		'''
+
+		# instantiate and create PCDMObject
+		obj = PCDMObject(self.repo, uri="%s/%s" % (pcdm_objects_path, uri))
+		obj.create(specify_uri=specify_uri)
+
+		# create proxy object with proxyFor and proxyIn predicates
+		proxy_obj = PCDMProxyObject(self.repo, uri="%s/members/%s" % (self.uri, uri), proxyForURI=obj.uri, proxyInURI=self.uri)
+		proxy_obj.create(specify_uri=specify_uri)
+
+		# return
+		return obj
+
+
+	def create_file(self, uri='', specify_uri=False, data=None, mimetype=None):
+
+		'''
+		add file to PCDMObject
+			- create NonRDFSource at /objects/page1/files/text
+			- because /files is DirectContainer, would create following triples:
+				- page1.uri --> pcdm.hasFile --> text.uri
+
+		Args:
+			uri: optional uri for child object (should not start with trailing slash)
+
+		Returns:
+			PCDMObject
+		'''
+
+		# instantiate and create PCDMBinary
+		binary = _models.Binary(self.repo, uri="%s/files/%s" % (self.uri, uri))
+
+		# if data and/or mimetype provided, set
+		if data:
+			binary.binary.data = data
+		if mimetype:
+			binary.binary.mimetype = mimetype
+
+		# create and return
+		binary.create(specify_uri=specify_uri)
+		return binary
+
+
 
 class PCDMProxyObject(_models.BasicContainer):
 
@@ -216,6 +273,7 @@ class PCDMProxyObject(_models.BasicContainer):
 		uri (rdflib.term.URIRef,str): input URI
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 		proxyFor (rdflib.term.URIRef,str): URI of resource this resource is a proxy for, sets ore:proxyFor triple
+		proxyFor (rdflib.term.URIRef,str): URI of resource this resource is a proxy in, sets ore:proxyIn triple
 	'''
 
 	def __init__(self, repo, uri='', response=None, proxyForURI=None, proxyInURI=None):

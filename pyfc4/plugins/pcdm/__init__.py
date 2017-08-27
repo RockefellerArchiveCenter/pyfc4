@@ -119,6 +119,12 @@ def create_pcdm_demo_resources_convenience(repo):
 	green = colors.create_child_object('green', specify_uri=True)
 	blue = colors.create_child_object('blue', specify_uri=True)
 
+	# create child to green
+	lime = green.create_child_object('lime', specify_uri=True)
+
+	# create poem for lime green
+	poem = lime.create_file('poem', specify_uri=True, data='you\'ve always been\ngood to me lime green', mimetype='text/plain')
+
 	# create collectoin without uri
 	generic_collection = models.PCDMCollection(repo)
 	generic_collection.create()
@@ -127,6 +133,12 @@ def create_pcdm_demo_resources_convenience(repo):
 	generic_child1 = generic_collection.create_child_object()
 	generic_child2 = generic_collection.create_child_object()
 	generic_child3 = generic_collection.create_child_object()
+
+	# create generic child to child1
+	generic_childA = generic_child1.create_child_object()
+
+	# create file for generic_childA
+	generic_file = generic_childA.create_file(data='We\'re in Delaware.', mimetype='text/plain')
 
 
 def delete_pcdm_demo_resources_convenience(repo):
