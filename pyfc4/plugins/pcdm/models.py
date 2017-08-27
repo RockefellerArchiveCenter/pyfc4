@@ -14,6 +14,10 @@ https://docs.google.com/document/d/1RI8aX8XQEk-30-Ht-DaPF5nz_VtI1-eqxUuDvF3nhv0/
 '''
 
 
+# configurations to be handled later (no trailing slash)
+pcdm_objects_path = 'objects'
+pcdm_collections_path = 'collections'
+
 
 class PCDMCollection(_models.BasicContainer):
 
@@ -33,12 +37,17 @@ class PCDMCollection(_models.BasicContainer):
 	When a PCDMCollection is created, the following child resources are automatically created:
 		- /members
 		- /related
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri=None, response=None):
+	def __init__(self, repo, uri='', response=None):
 
 		# fire parent Container init()
-		super().__init__(repo, uri=uri, response=response)
+		super().__init__(repo, uri="%s/%s" % (pcdm_collections_path, uri), response=response)
 
 
 	def _post_create(self):
@@ -68,18 +77,53 @@ class PCDMCollection(_models.BasicContainer):
 		related_child.create(specify_uri=True)
 
 
-	def delete(self):
+	# def delete(self):
+
+	# 	'''
+	# 	overrides BasicContainer .delete, removing all associated resources
+	# 	'''
+
+
+	def create_child_object(self, uri='', specify_uri=False):
 
 		'''
-		overrides BasicContainer .delete, removing all associated resources
+		create child object to collection
+			- create PCDMObject at /objects/raven
+			- create children /files, /members, /related, /associated
+			- create proxy obect at /collections/poe/members/raven_proxy (if uri provided), with the following triples:
+				- rdf:type --> ore.Proxy
+				- ore:proxyFor --> pcdmbar.uri
+			- because /members is DirectContainer, would create triples:
+				- poe.uri --> pcdm.hasMember --> raven.uri
+
+		Args:
+			uri: optional uri for child object (should not start with trailing slash)
+
+		Returns:
+			PCDMObject
 		'''
+
+		# instantiate and create PCDMObject
+		obj = PCDMObject(self.repo, uri="%s/%s" % (pcdm_objects_path, uri))
+		obj.create(specify_uri=specify_uri)
+
+		# create proxy object
+		# proxy_obj = PCDMObject(self.repo, uri="%s/members/%s" % (self.uri, uri))
+		# proxy_obj.create(specify_uri=specify_uri)
+		# proxy_obj.add_triple(proxy_obj.rdf.prefixes.rdf.type, proxy_obj.rdf.prefixes.ore.Proxy)
+		# proxy_obj.add_triple(proxy_obj.rdf.prefixes.ore.proxyFor, obj.uri)
+		# proxy_obj.update()
+
+		# create proxy object
+		proxy_obj = PCDMProxyObject(self.repo, uri="%s/members/%s" % (self.uri, uri), proxyForURI=obj.uri)
+		proxy_obj.create(specify_uri=specify_uri)
 
 
 
 class PCDMObject(_models.BasicContainer):
 
 	'''
-	Class to represent PCDM Collections in LDP.
+	Class to represent PCDM Objects in LDP.
 
 	----------------------------------------------------------------------------------
 	URI Template	--	Resource Identified
@@ -100,9 +144,14 @@ class PCDMObject(_models.BasicContainer):
 		- /members
 		- /related
 		- /associated
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri=None, response=None):
+	def __init__(self, repo, uri='', response=None):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
@@ -149,11 +198,61 @@ class PCDMObject(_models.BasicContainer):
 		associated_child.create(specify_uri=True)
 
 
-	def delete(self):
+	# def delete(self):
+
+	# 	'''
+	# 	overrides BasicContainer .delete, removing all associated resources
+	# 	'''
+
+
+
+class PCDMProxyObject(_models.BasicContainer):
+
+	'''
+	Class to represent PCDM Proxy Objects in PCDM/LDP
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		proxyFor (rdflib.term.URIRef,str): URI of resource this resource is a proxy for, sets ore:proxyFor triple
+	'''
+
+	def __init__(self, repo, uri='', response=None, proxyForURI=None, proxyInURI=None):
+
+		# fire parent Container init()
+		super().__init__(repo, uri=uri, response=response)
+
+		self.proxyForURI = proxyForURI
+		self.proxyInURI = proxyInURI
+
+
+	def _post_create(self):
 
 		'''
-		overrides BasicContainer .delete, removing all associated resources
+		resource.create() hook
 		'''
+
+		# set rdf type
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.ore.Proxy)
+
+		# set triple for what this resource is a proxy for
+		if self.proxyForURI:
+			self.add_triple(self.rdf.prefixes.ore.proxyFor, self.proxyForURI)
+
+		# if proxyIn set, add triple
+		if self.proxyInURI:
+			self.add_triple(self.rdf.prefixes.ore.proxyFor, self.proxyForURI)
+
+		# update
+		self.update()
+
+
+	# def delete(self):
+
+	# 	'''
+	# 	overrides BasicContainer .delete, removing all associated resources
+	# 	'''
 
 
 

@@ -1313,6 +1313,7 @@ class Resource(object):
 		# if auto_refresh set, and True, refresh
 		if auto_refresh:
 			self.parse_object_like_triples()
+			
 		# else, if auto_refresh is not set (None), check repository instance default
 		elif auto_refresh == None:
 			if self.repo.default_auto_refresh:

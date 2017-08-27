@@ -7,6 +7,7 @@ from pyfc4 import models as _models
 from pyfc4.plugins.pcdm import models
 
 
+
 # convenience function for creating example structure
 def create_pcdm_demo_resources(repo):
 
@@ -97,3 +98,48 @@ def delete_pcdm_demo_resources(repo):
 
 	pcdmdemo = repo.get_resource('pcdmdemo')
 	pcdmdemo.delete()
+
+
+
+# convenience function for creating example structure
+def create_pcdm_demo_resources_convenience(repo):
+
+	# create root objcts /collections and /objects
+	collections = _models.BasicContainer(repo, 'collections')
+	collections.create(specify_uri=True)
+	objects = _models.BasicContainer(repo, 'objects')
+	objects.create(specify_uri=True)
+
+	# create sample colors collection
+	colors = models.PCDMCollection(repo, 'colors')
+	colors.create(specify_uri=True)
+
+	# create sample objects
+	red = colors.create_child_object('red', specify_uri=True)
+	green = colors.create_child_object('green', specify_uri=True)
+	blue = colors.create_child_object('blue', specify_uri=True)
+
+	# create collectoin without uri
+	generic_collection = models.PCDMCollection(repo)
+	generic_collection.create()
+
+	# create generic children
+	generic_child1 = generic_collection.create_child_object()
+	generic_child2 = generic_collection.create_child_object()
+	generic_child3 = generic_collection.create_child_object()
+
+
+def delete_pcdm_demo_resources_convenience(repo):
+
+	'''
+	Convenience function to delete example hierarchy of PCDM resources.
+
+	Args:
+		repo (pyfc4.models.Repository): expects a repository instance
+	'''
+
+	collections = repo.get_resource('collections')
+	collections.delete()
+
+	objects = repo.get_resource('objects')
+	objects.delete()
