@@ -833,6 +833,8 @@ class Resource(object):
 				if not serialization_format:
 					serialization_format = self.repo.default_serialization
 				data = self.rdf.graph.serialize(format=serialization_format)
+				logger.debug('Serialized graph used for resource creatoin:')
+				logger.debug(data.decode('utf-8'))
 				self.headers['Content-Type'] = serialization_format
 			
 			# fire creation request
