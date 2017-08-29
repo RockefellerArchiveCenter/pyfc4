@@ -51,6 +51,24 @@ class PCDMCollection(_models.BasicContainer):
 		# fire parent Container init()
 		super().__init__(repo, uri="%s/%s" % (collections_path, uri), response=response)
 
+		# members, related
+		self.members = []
+		self.related = []
+
+		# if exists, populate
+		if self.exists:
+			self.get_members()
+			self.get_related()
+
+
+	def get_members(self):
+
+		'''
+		method to retrieve resources from ../members, per PCDM in LDP recs
+		'''
+
+
+
 
 	def _post_create(self):
 
@@ -86,35 +104,7 @@ class PCDMCollection(_models.BasicContainer):
 	# 	'''
 
 
-	def create_member_object(self, uri='', specify_uri=False):
 
-		'''
-		create member object for this collection
-			- create PCDMObject at /objects/{obj_id}
-			- create proxy obect at /collections/{col_id}/members, with the following triples:
-				- rdf:type --> ore.Proxy
-				- ore:proxyFor --> {obj_id}.uri
-			- because /members is DirectContainer, automatically creates triple:
-				- {col_id}.uri --> pcdm.hasMember --> {obj_id}.uri
-
-		Args:
-			uri: optional uri for child object
-			specify_uri: if True, issue PUT and specify URI, if False, issue POST and get repository minted URI
-
-		Returns:
-			PCDMObject
-		'''
-
-		# instantiate and create PCDMObject
-		obj = PCDMObject(self.repo, uri="%s/%s" % (objects_path, uri))
-		obj.create(specify_uri=specify_uri)
-
-		# create proxy object with proxyFor prdicate
-		proxy_obj = PCDMProxyObject(self.repo, uri="%s/members/%s" % (self.uri, uri), proxyForURI=obj.uri)
-		proxy_obj.create(specify_uri=specify_uri)
-
-		# return
-		return obj
 
 
 
@@ -203,114 +193,6 @@ class PCDMObject(_models.BasicContainer):
 	# 	'''
 
 
-	def create_member_object(self, uri='', specify_uri=False):
-
-		'''
-		create member object for this object
-			- create PCDMObject at /objects/{obj_id}
-			- create proxy object at /objects/{obj_id}/members/{proxy_obj_id} with triples:
-				- rdf.type --> ore.Proxy
-				- ore.proxyFor --> {obj_id}.uri
-				- ore.proxyIn --> {parent_obj_id}.uri
-			- because /members is IndirectContainer, would create triples:
-				- {parent_obj_id}.uri --> pcdm.hasMember --> {obj_id}.uri
-
-		Args:
-			uri: optional uri for child object
-
-		Returns:
-			PCDMObject
-		'''
-
-		# instantiate and create PCDMObject
-		obj = PCDMObject(self.repo, uri="%s/%s" % (objects_path, uri))
-		obj.create(specify_uri=specify_uri)
-
-		# create proxy object with proxyFor and proxyIn predicates
-		proxy_obj = PCDMProxyObject(self.repo, uri="%s/members/%s" % (self.uri, uri), proxyForURI=obj.uri, proxyInURI=self.uri)
-		proxy_obj.create(specify_uri=specify_uri)
-
-		# return
-		return obj
-
-
-	def create_file(self, uri='', specify_uri=False, data=None, mimetype=None):
-
-		'''
-		add file to PCDMObject
-			- create NonRDFSource at /objects/{obj_id}/files/{binary_id}
-			- because /files is DirectContainer, would create following triples:
-				- {obj_id}.uri --> pcdm.hasFile --> {binary_id}.uri
-
-		Args:
-			uri: optional uri for child object
-			data: optional data for binary resource
-			mimetype: optional mimetype for binary resource
-
-		Returns:
-			NonRDFSource (Binary)
-		'''
-
-		# instantiate and create PCDMBinary
-		binary = _models.Binary(self.repo, uri="%s/files/%s" % (self.uri, uri))
-
-		# if data and/or mimetype provided, set
-		if data:
-			binary.binary.data = data
-		if mimetype:
-			binary.binary.mimetype = mimetype
-
-		# create and return
-		binary.create(specify_uri=specify_uri)
-		return binary
-
-
-	def create_related_proxy_object(self, proxyForURI, uri='', specify_uri=False):
-
-		'''
-		Create related proxy object in {obj_id}.uri/related
-		Creates ore:aggregates for this object
-
-		Args:
-			proxyForURI: required, resource that ore:proxyFor points to
-			uri: optional uri for proxy object
-			specify_uri: if True, issue PUT and create URI, if False, issue POST and get repository minted URI
-		'''
-
-		# create proxy object with proxyFor and proxyIn predicates
-		proxy_obj = PCDMProxyObject(self.repo, uri="%s/related/%s" % (self.uri, uri), proxyForURI=proxyForURI)
-		proxy_obj.create(specify_uri=specify_uri)
-
-
-	def create_associated_file(self, uri='', specify_uri=False, data=None, mimetype=None):
-
-		'''
-		Create Binary file at {obj_id}.uri/associated
-			- create NonRDFSource at /objects/{obj_id}/associated/{associated_binary_id}
-			- because /associated is DirectContainer, would create following triples:
-				- {obj_id}.uri --> pcdm.hasRelatedFile --> {associated_binary_id}.uri
-
-		Args:
-			uri: optional uri for child object
-			data: optional data for binary resource
-			mimetype: mimetype for binary resource
-
-		Returns:
-			Binary
-		'''
-
-		# instantiate and create PCDMBinary
-		binary = _models.Binary(self.repo, uri="%s/associated/%s" % (self.uri, uri))
-
-		# if data and/or mimetype provided, set
-		if data:
-			binary.binary.data = data
-		if mimetype:
-			binary.binary.mimetype = mimetype
-
-		# create and return
-		binary.create(specify_uri=specify_uri)
-		return binary
 
 
 

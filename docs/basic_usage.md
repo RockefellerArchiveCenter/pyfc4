@@ -46,6 +46,66 @@ In [3]: bc.uri # check newly created and assigned resource uri
 Out[3]: rdflib.term.URIRef('http://localhost:8080/rest/c4/a1/12/f5/c4a112f5-ab38-476c-8ebc-75b221b18300')
 ```
 
+Though each resource contains mechanisms for viewing and modifying RDF data under `self.rdf`, there is the convenience method `self.dump()` to return the raw RDF for the resource:
+```
+# default serialization is turtle (ttl)
+In [5]: print(foo.dump())
+
+@prefix dbpedia: <http://dbpedia.org/ontology/> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> .
+@prefix fedora: <http://fedora.info/definitions/v4/repository#> .
+@prefix fedoraconfig: <http://fedora.info/definitions/v4/config#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ldp: <http://www.w3.org/ns/ldp#> .
+@prefix ore: <http://www.openarchives.org/ore/terms/> .
+@prefix pcdm: <http://pcdm.org/models#> .
+@prefix premis: <http://www.loc.gov/premis/rdf/v1#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix test: <info:fedora/test/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xmlns: <http://www.w3.org/2000/xmlns/> .
+@prefix xs: <http://www.w3.org/2001/XMLSchema> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<http://localhost:8080/rest/foo> a fedora:Container,
+        fedora:Resource,
+        ldp:Container,
+        ldp:RDFSource ;
+    fedora:created "2017-08-29T20:05:57.109000+00:00"^^xsd:dateTime ;
+    fedora:createdBy "bypassAdmin"^^xsd:string ;
+    fedora:hasParent <http://localhost:8080/rest/> ;
+    fedora:lastModified "2017-08-29T20:05:57.109000+00:00"^^xsd:dateTime ;
+    fedora:lastModifiedBy "bypassAdmin"^^xsd:string ;
+    fedora:writable true .
+
+```
+
+Optionally, provide a serialization format that python's rdflib library accepts, such as `application/rdf+xml`:
+```
+In [7]: print(foo.dump(format='application/rdf+xml'))
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+   xmlns:fedora="http://fedora.info/definitions/v4/repository#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+>
+  <rdf:Description rdf:about="http://localhost:8080/rest/foo">
+    <fedora:lastModifiedBy rdf:datatype="http://www.w3.org/2001/XMLSchema#string">bypassAdmin</fedora:lastModifiedBy>
+    <rdf:type rdf:resource="http://fedora.info/definitions/v4/repository#Resource"/>
+    <rdf:type rdf:resource="http://fedora.info/definitions/v4/repository#Container"/>
+    <fedora:lastModified rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2017-08-29T20:05:57.109000+00:00</fedora:lastModified>
+    <fedora:writable rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</fedora:writable>
+    <rdf:type rdf:resource="http://www.w3.org/ns/ldp#Container"/>
+    <fedora:createdBy rdf:datatype="http://www.w3.org/2001/XMLSchema#string">bypassAdmin</fedora:createdBy>
+    <rdf:type rdf:resource="http://www.w3.org/ns/ldp#RDFSource"/>
+    <fedora:created rdf:datatype="http://www.w3.org/2001/XMLSchema#dateTime">2017-08-29T20:05:57.109000+00:00</fedora:created>
+    <fedora:hasParent rdf:resource="http://localhost:8080/rest/"/>
+  </rdf:Description>
+</rdf:RDF>
+```
+
 #### Create NonRDF (Binary) Resources
 
 FC4, and LDP instances in general, also have [NonRDFSource](https://www.w3.org/TR/ldp/#ldpnr) (Binary) resources.  These contain binary files.

@@ -894,8 +894,8 @@ class Resource(object):
 		else:
 			raise Exception('HTTP %s, unknown error creating resource' % response.status_code)
 
-		# if all goes well, return True
-		return True
+		# if all goes well, return self
+		return self
 
 
 	def options(self):
@@ -919,10 +919,15 @@ class Resource(object):
 
 		'''
 		Method to move resource to another location.
-		Note: by default, this leaves a tombstone.  Can use optional flag remove_tombstone to remove on successful move.
+		Note: by default, this method removes the tombstone at the resource's original URI.
+		Can use optional flag remove_tombstone to keep tombstone on successful move.
+
+		Note: other resource's triples that are managed by Fedora that point to this resource,
+		*will* point to the new URI after the move.
 
 		Args:
 			destination (rdflib.term.URIRef, str): URI location to move resource
+			remove_tombstone (bool): defaults to False, set to True to keep tombstone
 
 		Returns:
 			(Resource) new, moved instance of resource
@@ -941,7 +946,12 @@ class Resource(object):
 			# handle tombstone
 			if remove_tombstone:
 				tombstone_response = self.repo.api.http_request('DELETE', "%s/fcr:tombstone" % self.uri)
+
+			# udpdate uri, refresh, and return
+			self.uri = destination_uri
+			self.refresh()
 			return destination_uri
+
 		else:
 			raise Exception('HTTP %s, could not move resource %s to %s' % (response.status_code, self.uri, destination_uri))
 
@@ -1521,6 +1531,20 @@ class Resource(object):
 
 			# affix version
 			self._affix_version(version_uri, version_label)
+
+
+	def dump(self,format='ttl'):
+
+		'''
+		Convenience method to return RDF data for resource,
+		optionally selecting serialization format.
+		Inspired by .dump from Samvera.
+
+		Args:
+			format (str): expecting serialization formats accepted by rdflib.serialization(format=)
+		'''
+
+		return self.rdf.graph.serialize(format=format).decode('utf-8')
 
 
 
