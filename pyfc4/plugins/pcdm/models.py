@@ -45,10 +45,14 @@ class PCDMCollection(_models.BasicContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri='', response=None):
+	def __init__(self, repo, uri='', response=None, retrieve_pcdm_links=True):
 
 		# fire parent Container init()
 		super().__init__(repo, uri="%s/%s" % (collections_path, uri), response=response)
+
+		# members, related
+		self.members = self.get_members(retrieve=retrieve_pcdm_links)
+		self.related = self.get_related(retrieve=retrieve_pcdm_links)
 
 		
 	def _post_create(self):
@@ -85,6 +89,54 @@ class PCDMCollection(_models.BasicContainer):
 	# 	'''
 
 
+	def get_members(self, retrieve=False):
+
+		'''
+		get pcdm:hasMember for this resource, optionally retrieving resource payload
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
+			members = [ PCDMObject(self.repo, uri) for uri in self.rdf.triples.pcdm.hasMember ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for member in members:
+					member.refresh()
+
+			# return
+			return members
+
+		else:
+			return []
+
+
+	def get_related(self, retrieve=False):
+
+		'''
+		get ore:aggregates for this resource, optionally retrieving resource payload
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
+			related = [ PCDMCollection(self.repo, uri) for uri in self.rdf.triples.ore.aggregates ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for resource in related:
+					resource.refresh()
+
+			# return
+			return related
+
+		else:
+			return []
+
+
 class PCDMObject(_models.BasicContainer):
 
 	'''
@@ -116,15 +168,16 @@ class PCDMObject(_models.BasicContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri='', response=None):
+	def __init__(self, repo, uri='', response=None, retrieve_pcdm_links=True):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
 
 		# members, related
-		self.members = self.get_members()
-		self.files = self.get_files()
-		self.associated = self.get_associated()
+		self.members = self.get_members(retrieve=retrieve_pcdm_links)
+		self.files = self.get_files(retrieve=retrieve_pcdm_links)
+		self.associated = self.get_associated(retrieve=retrieve_pcdm_links)
+		self.related = self.get_related(retrieve=retrieve_pcdm_links)
 
 
 	def get_members(self, retrieve=False):
@@ -136,7 +189,7 @@ class PCDMObject(_models.BasicContainer):
 			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		if self.exists and hasattr(self.rdf.triples.pcdm, 'hasMember'):
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
 			members = [ PCDMObject(self.repo, uri) for uri in self.rdf.triples.pcdm.hasMember ]
 
 			# if retrieve, perform retrieve through .refresh()
@@ -160,7 +213,7 @@ class PCDMObject(_models.BasicContainer):
 			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		if self.exists and hasattr(self.rdf.triples.pcdm, 'hasFile'):
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasFile'):
 			files = [ _models.NonRDFSource(self.repo, uri) for uri in self.rdf.triples.pcdm.hasFile ]
 
 			# if retrieve, perform retrieve through .refresh()
@@ -184,7 +237,7 @@ class PCDMObject(_models.BasicContainer):
 			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		if self.exists and hasattr(self.rdf.triples.pcdm, 'hasRelatedFile'):
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasRelatedFile'):
 			files = [ _models.NonRDFSource(self.repo, uri) for uri in self.rdf.triples.pcdm.hasRelatedFile ]
 
 			# if retrieve, perform retrieve through .refresh()
@@ -194,6 +247,30 @@ class PCDMObject(_models.BasicContainer):
 
 			# return
 			return files
+
+		else:
+			return []
+
+
+	def get_related(self, retrieve=False):
+
+		'''
+		get ore:aggregates for this resource, optionally retrieving resource payload
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
+			related = [ PCDMObject(self.repo, uri) for uri in self.rdf.triples.ore.aggregates ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for resource in related:
+					resource.refresh()
+
+			# return
+			return related
 
 		else:
 			return []
