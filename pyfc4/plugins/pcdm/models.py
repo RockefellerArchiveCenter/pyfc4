@@ -13,6 +13,7 @@ Implementation of PCDM in LDP:
 https://docs.google.com/document/d/1RI8aX8XQEk-30-Ht-DaPF5nz_VtI1-eqxUuDvF3nhv0/edit#
 '''
 
+
 # configurations
 # TODO: https://github.com/ghukill/pyfc4/issues/76
 objects_path = 'objects'
@@ -30,9 +31,9 @@ class PCDMCollection(_models.BasicContainer):
 	----------------------------------------------------------------------------------
 	/collections/{id}	--	A Collection
 	/collections/{id}/members/	--	Membership container for the parent Collection
-	/collections/{id}/members/{prxid}	--	Proxy for the member Collection or Object
+	/collections/{id}/members/{proxy_obj_id}	--	Proxy for the member Collection or Object
 	/collections/{id}/related/	--	Related object container for the parent Collection
-	/collections/{id}/related/{prxid}	--	 Proxy for the related Object
+	/collections/{id}/related/{proxy_obj_id}	--	 Proxy for the related Object
 	----------------------------------------------------------------------------------
 
 	When a PCDMCollection is created, the following child resources are automatically created:
@@ -41,7 +42,7 @@ class PCDMCollection(_models.BasicContainer):
 
 	Args:
 		repo (Repository): instance of Repository class
-		uri (rdflib.term.URIRef,str): input URI
+		uri (rdflib.term.URIRef, str): input URI
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
@@ -89,17 +90,16 @@ class PCDMCollection(_models.BasicContainer):
 
 		'''
 		create member object for this collection
-			- create PCDMObject at /objects/raven
-			- create children /files, /members, /related, /associated
-			- create proxy obect at /collections/poe/members/raven_proxy (if uri provided), with the following triples:
+			- create PCDMObject at /objects/{obj_id}
+			- create proxy obect at /collections/{col_id}/members, with the following triples:
 				- rdf:type --> ore.Proxy
-				- ore:proxyFor --> pcdmbar.uri
-			- because /members is DirectContainer, would create triples:
-				- poe.uri --> pcdm.hasMember --> raven.uri
+				- ore:proxyFor --> {obj_id}.uri
+			- because /members is DirectContainer, automatically creates triple:
+				- {col_id}.uri --> pcdm.hasMember --> {obj_id}.uri
 
 		Args:
-			uri: optional uri for child object (should not start with trailing slash)
-			specify_uri: if True, issue PUT and create URI, if False, issue POST and get repository minted URI
+			uri: optional uri for child object
+			specify_uri: if True, issue PUT and specify URI, if False, issue POST and get repository minted URI
 
 		Returns:
 			PCDMObject
@@ -128,12 +128,12 @@ class PCDMObject(_models.BasicContainer):
 	----------------------------------------------------------------------------------
 	/objects/{id}	--	An Object
 	/objects/{id}/files/	--	Container for component Files of the Object
-	/objects/{id}/files/{bsid}	--	A component File
-	/objects/{id}/files/{bsid}/fcr:metadata	--	Technical metadata about the File
+	/objects/{id}/files/{binary_id}	--	A component File
+	/objects/{id}/files/{binary_id}/fcr:metadata	--	Technical metadata about the File
 	/objects/{id}/members/	--	Membership container for the parent Object
-	/objects/{id}/members/{prxid}	--	Proxy for the member Object
+	/objects/{id}/members/{proxy_obj_id}	--	Proxy for the member Object
 	/objects/{id}/related/	--	Related object container for the parent Object
-	/objects/{id}/related/{prxid}	--	Proxy for the related Object
+	/objects/{id}/related/{proxy_obj_id}	--	Proxy for the related Object
 	/objects/{id}/associated/	--	Container for associated Files
 	----------------------------------------------------------------------------------
 
@@ -207,17 +207,16 @@ class PCDMObject(_models.BasicContainer):
 
 		'''
 		create member object for this object
-			- create PCDMObject at /objects/page1 (good example where naming URIs is not ideal...)
-			- create normal PCDMObject children /files, /members, /related, /associated
-			- create proxy object at /objects/raven/members/page1_proxy with triples:
+			- create PCDMObject at /objects/{obj_id}
+			- create proxy object at /objects/{obj_id}/members/{proxy_obj_id} with triples:
 				- rdf.type --> ore.Proxy
-				- ore.proxyFor --> page1.uri
-				- ore.proxyIn --> raven.uri
+				- ore.proxyFor --> {obj_id}.uri
+				- ore.proxyIn --> {parent_obj_id}.uri
 			- because /members is IndirectContainer, would create triples:
-				- raven.uri --> pcdm.hasMember --> page1.uri
+				- {parent_obj_id}.uri --> pcdm.hasMember --> {obj_id}.uri
 
 		Args:
-			uri: optional uri for child object (should not start with trailing slash)
+			uri: optional uri for child object
 
 		Returns:
 			PCDMObject
@@ -239,17 +238,17 @@ class PCDMObject(_models.BasicContainer):
 
 		'''
 		add file to PCDMObject
-			- create NonRDFSource at /objects/page1/files/text
+			- create NonRDFSource at /objects/{obj_id}/files/{binary_id}
 			- because /files is DirectContainer, would create following triples:
-				- page1.uri --> pcdm.hasFile --> text.uri
+				- {obj_id}.uri --> pcdm.hasFile --> {binary_id}.uri
 
 		Args:
-			uri: optional uri for child object (should not start with trailing slash)
+			uri: optional uri for child object
 			data: optional data for binary resource
-			mimetype: mimetype for binary resource
+			mimetype: optional mimetype for binary resource
 
 		Returns:
-			Binary
+			NonRDFSource (Binary)
 		'''
 
 		# instantiate and create PCDMBinary
@@ -269,12 +268,12 @@ class PCDMObject(_models.BasicContainer):
 	def create_related_proxy_object(self, proxyForURI, uri='', specify_uri=False):
 
 		'''
-		Create related proxy object in self.uri/related.
+		Create related proxy object in {obj_id}.uri/related
 		Creates ore:aggregates for this object
 
 		Args:
 			proxyForURI: required, resource that ore:proxyFor points to
-			uri: optional uri for proxy object (should not start with trailing slash)
+			uri: optional uri for proxy object
 			specify_uri: if True, issue PUT and create URI, if False, issue POST and get repository minted URI
 		'''
 
@@ -286,13 +285,13 @@ class PCDMObject(_models.BasicContainer):
 	def create_associated_file(self, uri='', specify_uri=False, data=None, mimetype=None):
 
 		'''
-		add file to PCDMObject at /associated
-			- create NonRDFSource at /objects/page1/associated/fits
+		Create Binary file at {obj_id}.uri/associated
+			- create NonRDFSource at /objects/{obj_id}/associated/{associated_binary_id}
 			- because /associated is DirectContainer, would create following triples:
-				- page1.uri --> pcdm.hasRelatedFile --> fits.uri
+				- {obj_id}.uri --> pcdm.hasRelatedFile --> {associated_binary_id}.uri
 
 		Args:
-			uri: optional uri for child object (should not start with trailing slash)
+			uri: optional uri for child object
 			data: optional data for binary resource
 			mimetype: mimetype for binary resource
 
@@ -329,6 +328,10 @@ class PCDMProxyObject(_models.BasicContainer):
 	'''
 
 	def __init__(self, repo, uri='', response=None, proxyForURI=None, proxyInURI=None):
+
+		# if full URI provided, as is the case with retrieval, derive "short" URI
+		if repo.root in uri:
+			uri = uri.split(collections_path)[-1].lstrip('/')
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
@@ -398,16 +401,6 @@ class PCDMFilesContainer(_models.DirectContainer):
 			hasMemberRelation=hasMemberRelation)
 
 
-	def _post_create(self):
-
-		'''
-		resource.create() hook
-		'''
-
-		logger.debug('no additional create actions')
-		return True
-
-
 
 class PCDMMembersContainer(_models.IndirectContainer):
 
@@ -443,16 +436,6 @@ class PCDMMembersContainer(_models.IndirectContainer):
 			membershipResource=membershipResource,
 			hasMemberRelation=hasMemberRelation,
 			insertedContentRelation=insertedContentRelation)
-
-
-	def _post_create(self):
-
-		'''
-		resource.create() hook
-		'''
-
-		logger.debug('no additional create actions')
-		return True
 
 
 
@@ -492,16 +475,6 @@ class PCDMRelatedContainer(_models.IndirectContainer):
 			insertedContentRelation=insertedContentRelation)
 
 
-	def _post_create(self):
-
-		'''
-		resource.create() hook
-		'''
-
-		logger.debug('no additional create actions')
-		return True
-
-
 
 class PCDMAssociatedContainer(_models.DirectContainer):
 
@@ -534,16 +507,6 @@ class PCDMAssociatedContainer(_models.DirectContainer):
 			response=response,
 			membershipResource=membershipResource,
 			hasMemberRelation=hasMemberRelation)
-
-
-	def _post_create(self):
-
-		'''
-		resource.create() hook
-		'''
-
-		logger.debug('no additional create actions')
-		return True
 
 
 
