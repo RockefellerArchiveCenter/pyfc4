@@ -13,10 +13,15 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 logger.debug('''
-#######################################################################
-pyfc4 debug/convenience console.  All our triples are belong to you.
-#######################################################################\
+###################################
+  pyfc4 debug/convenience console
+###################################\
 ''')
+
+
+################################################
+# Repository Configurations
+################################################
 
 # console configurations
 from tests.localsettings import *
@@ -36,16 +41,19 @@ fast_repo = Repository(
 	default_auto_refresh=False
 	)
 
-'''
-The following functions are created entirely for convenience/testing purposes.
-'''
+
+################################################
+# Convenience Functions
+################################################
 
 # fast get
 def get(uri):
 	return repo.get_resource(uri)
 	
 
-# demo resources
+################################################
+# Demo Resources
+################################################
 def create_demo_resources():
 
 	# foo

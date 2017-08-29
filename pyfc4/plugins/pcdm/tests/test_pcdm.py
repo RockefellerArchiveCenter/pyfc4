@@ -1,9 +1,10 @@
 # pyfc4 - tests
 
+# import pyfc4 models
 from pyfc4.models import *
 
 # import pcdm plugin
-from pyfc4.plugins.pcdm.models import PCDMCollection, PCDMObject
+from pyfc4.plugins import pcdm
 
 from tests import localsettings
 
@@ -53,55 +54,85 @@ class TestSetup(object):
 ########################################################
 class TestCRUD(object):
 
+	def test_create_pcdm_root_containers(self):
+		# overwrite pcdm defaults
+		pcdm.models.objects_path = '%s/objects' % testing_container_uri
+		pcdm.models.collections_path = '%s/collections' % testing_container_uri
 
-	def test_create_pcdm_collection(self):
-
-		# create resource
-		pcdm_col = PCDMCollection(repo, '%s/pcdm_col' % testing_container_uri)
-		pcdm_col.create(specify_uri=True)
-
-		# assert exists
-		assert pcdm_col.exists
-
-		# assert PCDM Collection
-		assert type(pcdm_col) == PCDMCollection
-
-		# assert extending BasicContainer
-		assert isinstance(pcdm_col, BasicContainer)
+		# create containers for collections and objects
+		collections = BasicContainer(repo, "%s" % (pcdm.models.collections_path))
+		collections.create(specify_uri=True)
+		assert collections.exists
+		objects = BasicContainer(repo, "%s" % (pcdm.models.objects_path))
+		objects.create(specify_uri=True)
+		assert objects.exists
 
 
-	def test_retrieve_pcdm_collection(self):
+	def test_create_and_retrieve_collection(self):
 
-		# retrieve resource
-		pcdm_col = repo.get_resource('%s/pcdm_col' % testing_container_uri, resource_type=PCDMCollection)
+		# create sample colors collection
+		colors = pcdm.models.PCDMCollection(repo, 'colors')
+		colors.create(specify_uri=True)
+		assert colors.exists
 
-		# assert PCDM Collection
-		assert type(pcdm_col) == PCDMCollection
+		# retrieve collection
+		colors = repo.get_resource('%s/collections/colors' % testing_container_uri, resource_type=pcdm.models.PCDMCollection)
+		assert type(colors) == pcdm.models.PCDMCollection
 
-
-	def test_create_pcdm_object(self):
-
-		# create resource
-		pcdm_obj = PCDMObject(repo, '%s/pcdm_obj' % testing_container_uri)
-		pcdm_obj.create(specify_uri=True)
-
-		# assert exists
-		assert pcdm_obj.exists
-
-		# assert PCDM Object
-		assert type(pcdm_obj) == PCDMObject
-
-		# assert extending BasicContainer
-		assert isinstance(pcdm_obj, BasicContainer)
+		# make global
+		global colors
 
 
-	def test_retrieve_pcdm_object(self):
+	def test_create_and_retrieve_objects(self):
 
-		# retrieve resource
-		pcdm_obj = repo.get_resource('%s/pcdm_obj' % testing_container_uri, resource_type=PCDMObject)
+		# create sample objects
+		red = colors.create_member_object('red', specify_uri=True)
+		global red
+		green = colors.create_member_object('green', specify_uri=True)
+		global green
+		blue = colors.create_member_object('blue', specify_uri=True)
+		global blue
 
-		# assert PCDM Collection
-		assert type(pcdm_obj) == PCDMObject
+		# assert child object exists
+		assert green.exists
+
+		# retrieve and assert type
+		green = repo.get_resource('%s/objects/green' % testing_container_uri, resource_type=pcdm.models.PCDMObject)
+		assert type(green) == pcdm.models.PCDMObject
+
+
+
+
+
+	# # create children to green
+	# lime = green.create_member_object('lime', specify_uri=True)
+	# chartreuse = green.create_member_object('chartreuse', specify_uri=True)
+
+	# # create poem for lime green
+	# poem = lime.create_file('poem', specify_uri=True, data='you\'ve always been\ngood to me lime green', mimetype='text/plain')
+
+	# # create related proxy object for lime
+	# lime.create_related_proxy_object(chartreuse.uri,'chartreuse',specify_uri=True)
+
+	# # create associated spectrum file for lime
+	# lime.create_associated_file('spectrum',data='570nm',mimetype='text/plain',specify_uri=True)
+
+	# # create collectoin without uri
+	# generic_collection = models.PCDMCollection(repo)
+	# generic_collection.create()
+
+	# # create generic children
+	# generic_child1 = generic_collection.create_member_object()
+	# generic_child2 = generic_collection.create_member_object()
+	# generic_child3 = generic_collection.create_member_object()
+
+	# # create generic child to child1
+	# generic_childA = generic_child1.create_member_object()
+
+	# # create file for generic_childA
+	# generic_file = generic_childA.create_file(data='We\'re in Delaware.', mimetype='text/plain')
+
+
 
 
 
