@@ -20,7 +20,6 @@ objects_path = 'objects'
 collections_path = 'collections'
 
 
-
 class PCDMCollection(_models.BasicContainer):
 
 	'''
@@ -51,25 +50,7 @@ class PCDMCollection(_models.BasicContainer):
 		# fire parent Container init()
 		super().__init__(repo, uri="%s/%s" % (collections_path, uri), response=response)
 
-		# members, related
-		self.members = []
-		self.related = []
-
-		# if exists, populate
-		if self.exists:
-			self.get_members()
-			self.get_related()
-
-
-	def get_members(self):
-
-		'''
-		method to retrieve resources from ../members, per PCDM in LDP recs
-		'''
-
-
-
-
+		
 	def _post_create(self):
 
 		'''
@@ -102,10 +83,6 @@ class PCDMCollection(_models.BasicContainer):
 	# 	'''
 	# 	overrides BasicContainer .delete, removing all associated resources
 	# 	'''
-
-
-
-
 
 
 class PCDMObject(_models.BasicContainer):
@@ -143,6 +120,83 @@ class PCDMObject(_models.BasicContainer):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
+
+		# members, related
+		self.members = self.get_members()
+		self.files = self.get_files()
+		self.associated = self.get_associated()
+
+
+	def get_members(self, retrieve=False):
+
+		'''
+		get pcdm:hasMember for this resource, optionally retrieving resource payload
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples.pcdm, 'hasMember'):
+			members = [ PCDMObject(self.repo, uri) for uri in self.rdf.triples.pcdm.hasMember ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for member in members:
+					member.refresh()
+
+			# return
+			return members
+
+		else:
+			return []
+
+
+	def get_files(self, retrieve=False):
+
+		'''
+		get pcdm:hasFile for this resource, optionally retrieving resource payload
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples.pcdm, 'hasFile'):
+			files = [ _models.NonRDFSource(self.repo, uri) for uri in self.rdf.triples.pcdm.hasFile ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for file in files:
+					file.refresh()
+
+			# return
+			return files
+
+		else:
+			return []
+
+
+	def get_associated(self, retrieve=False):
+
+		'''
+		get pcdm:hasRelatedFile for this resource, optionally retrieving resource payload
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples.pcdm, 'hasRelatedFile'):
+			files = [ _models.NonRDFSource(self.repo, uri) for uri in self.rdf.triples.pcdm.hasRelatedFile ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for file in files:
+					file.refresh()
+
+			# return
+			return files
+
+		else:
+			return []
 
 
 	def _post_create(self):
