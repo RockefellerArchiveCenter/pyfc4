@@ -588,7 +588,7 @@ class TestMovingCopying(object):
 		ephem2 = repo.get_resource(ephem.move('%s/ephem2' % testing_container_uri))
 
 		# test
-		assert not ephem.exists
+		assert not repo.get_resource('%s/ephem' % testing_container_uri)
 		assert ephem2.exists
 
 
