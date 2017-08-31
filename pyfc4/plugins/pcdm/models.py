@@ -45,10 +45,10 @@ class PCDMCollection(_models.BasicContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri='', response=None, retrieve_pcdm_links=True):
+	def __init__(self, repo, uri=None, response=None, retrieve_pcdm_links=True):
 
 		# fire parent Container init()
-		super().__init__(repo, uri="%s/%s" % (collections_path, uri), response=response)
+		super().__init__(repo, uri=uri, response=response)
 
 		# members, related
 		self.members = self.get_members(retrieve=retrieve_pcdm_links)
@@ -60,7 +60,7 @@ class PCDMCollection(_models.BasicContainer):
 		'''
 		resource.create() hook
 
-		For PCDM Collections, post creation, also create 
+		For PCDM Collections, post creation, also create
 		'''
 
 		# create /members child resource
@@ -168,7 +168,7 @@ class PCDMObject(_models.BasicContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri='', response=None, retrieve_pcdm_links=True):
+	def __init__(self, repo, uri=None, response=None, retrieve_pcdm_links=True):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
@@ -340,11 +340,7 @@ class PCDMProxyObject(_models.BasicContainer):
 		proxyFor (rdflib.term.URIRef,str): URI of resource this resource is a proxy in, sets ore:proxyIn triple
 	'''
 
-	def __init__(self, repo, uri='', response=None, proxyForURI=None, proxyInURI=None):
-
-		# if full URI provided, as is the case with retrieval, derive "short" URI
-		if repo.root in uri:
-			uri = uri.split(collections_path)[-1].lstrip('/')
+	def __init__(self, repo, uri=None, response=None, proxyForURI=None, proxyInURI=None):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
