@@ -56,6 +56,7 @@ class PCDMCollection(_models.BasicContainer):
 		self.members = self.get_members()
 		self._orig_members = copy.deepcopy(self.members)
 		self.related = self.get_related()
+		self._orig_related = copy.deepcopy(self.related)
 
 		
 	def _post_create(self):
@@ -65,6 +66,10 @@ class PCDMCollection(_models.BasicContainer):
 
 		For PCDM Collections, post creation, also create
 		'''
+
+		# set PCDM triple as Collection
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.pcdm.Collection)
+		self.update()
 
 		# create /members child resource
 		members_child = PCDMMembersContainer(
@@ -83,35 +88,6 @@ class PCDMCollection(_models.BasicContainer):
 			hasMemberRelation=self.rdf.prefixes.ore.aggregates,
 			insertedContentRelation=self.rdf.prefixes.ore.proxyFor)
 		related_child.create(specify_uri=True)
-
-
-	def _post_update(self):
-
-		logger.debug("firing post_update")
-
-		# determine member diff
-		member_diff = {
-			'new':set(self.members) - set(self._orig_members),
-			'removed':set(self._orig_members) - set(self.members)
-		}
-		logger.debug(member_diff)
-
-		# create proxy objects for added members
-		for resource_uri in member_diff['new']:
-			proxy_obj = PCDMProxyObject(self.repo, uri="%s/members" % (self.uri), proxyForURI=resource_uri)
-			proxy_obj.create()
-
-		# remove proxy objects for added members
-		for resource_uri in member_diff['removed']:
-			proxy_obj = self.repo.get_resource(resource_uri)
-			proxy_obj.delete(remove_tombstone=True)
-
-
-	# def delete(self):
-
-	# 	'''
-	# 	overrides BasicContainer .delete, removing all associated resources
-	# 	'''
 
 
 	def get_members(self):
@@ -152,6 +128,66 @@ class PCDMCollection(_models.BasicContainer):
 			return []
 
 
+	def _post_update(self):
+		
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def _post_refresh(self):
+
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def update_pcdm_relationship(self):
+
+		'''
+		'''
+
+		logger.debug("updating PCDM relationships")
+
+		# determine member diff
+		member_diff = {
+			'new':set(self.members) - set(self._orig_members),
+			'removed':set(self._orig_members) - set(self.members)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in member_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/members" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in member_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
+
+
+		# determine member diff
+		related_diff = {
+			'new':set(self.related) - set(self._orig_related),
+			'removed':set(self._orig_related) - set(self.related)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in related_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/related" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in related_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
+
+
+
 class PCDMObject(_models.BasicContainer):
 
 	'''
@@ -190,105 +226,13 @@ class PCDMObject(_models.BasicContainer):
 
 		# members, related
 		self.members = self.get_members(retrieve=retrieve_pcdm_links)
+		self._orig_members = copy.deepcopy(self.members)
 		self.files = self.get_files(retrieve=retrieve_pcdm_links)
+		self._orig_files = copy.deepcopy(self.files)
 		self.associated = self.get_associated(retrieve=retrieve_pcdm_links)
+		self._orig_associated = copy.deepcopy(self.associated)
 		self.related = self.get_related(retrieve=retrieve_pcdm_links)
-
-
-	def get_members(self, retrieve=False):
-
-		'''
-		get pcdm:hasMember for this resource, optionally retrieving resource payload
-
-		Args:
-			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
-		'''
-
-		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
-			members = [ PCDMObject(self.repo, uri) for uri in self.rdf.triples.pcdm.hasMember ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for member in members:
-					member.refresh()
-
-			# return
-			return members
-
-		else:
-			return []
-
-
-	def get_files(self, retrieve=False):
-
-		'''
-		get pcdm:hasFile for this resource, optionally retrieving resource payload
-
-		Args:
-			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
-		'''
-
-		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasFile'):
-			files = [ _models.NonRDFSource(self.repo, uri) for uri in self.rdf.triples.pcdm.hasFile ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for file in files:
-					file.refresh()
-
-			# return
-			return files
-
-		else:
-			return []
-
-
-	def get_associated(self, retrieve=False):
-
-		'''
-		get pcdm:hasRelatedFile for this resource, optionally retrieving resource payload
-
-		Args:
-			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
-		'''
-
-		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasRelatedFile'):
-			files = [ _models.NonRDFSource(self.repo, uri) for uri in self.rdf.triples.pcdm.hasRelatedFile ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for file in files:
-					file.refresh()
-
-			# return
-			return files
-
-		else:
-			return []
-
-
-	def get_related(self, retrieve=False):
-
-		'''
-		get ore:aggregates for this resource, optionally retrieving resource payload
-
-		Args:
-			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
-		'''
-
-		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
-			related = [ PCDMObject(self.repo, uri) for uri in self.rdf.triples.ore.aggregates ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for resource in related:
-					resource.refresh()
-
-			# return
-			return related
-
-		else:
-			return []
+		self._orig_related = copy.deepcopy(self.related)
 
 
 	def _post_create(self):
@@ -296,6 +240,10 @@ class PCDMObject(_models.BasicContainer):
 		'''
 		resource.create() hook
 		'''
+
+		# set PCDM triple as Object
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.pcdm.Object)
+		self.update()
 
 		# create /files child resource
 		files_child = PCDMFilesContainer(
@@ -332,13 +280,159 @@ class PCDMObject(_models.BasicContainer):
 		associated_child.create(specify_uri=True)
 
 
-	# def delete(self):
+	def get_members(self, retrieve=False):
 
-	# 	'''
-	# 	overrides BasicContainer .delete, removing all associated resources
-	# 	'''
+		'''
+		get pcdm:hasMember for this resource
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
+			members = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasMember ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for member in members:
+					member.refresh()
+
+			# return
+			return members
+
+		else:
+			return []
 
 
+	def get_files(self, retrieve=False):
+
+		'''
+		get pcdm:hasFile for this resource
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasFile'):
+			files = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasFile ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for file in files:
+					file.refresh()
+
+			# return
+			return files
+
+		else:
+			return []
+
+
+	def get_associated(self, retrieve=False):
+
+		'''
+		get pcdm:hasRelatedFile for this resource
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasRelatedFile'):
+			files = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasRelatedFile ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for file in files:
+					file.refresh()
+
+			# return
+			return files
+
+		else:
+			return []
+
+
+	def get_related(self, retrieve=False):
+
+		'''
+		get ore:aggregates for this resource
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
+			related = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.ore.aggregates ]
+
+			# if retrieve, perform retrieve through .refresh()
+			if retrieve:
+				for resource in related:
+					resource.refresh()
+
+			# return
+			return related
+
+		else:
+			return []
+
+
+	def _post_update(self):
+		
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def _post_refresh(self):
+
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def update_pcdm_relationship(self):
+
+		'''
+		'''
+
+		logger.debug("updating PCDM relationships")
+
+		# determine member diff
+		member_diff = {
+			'new':set(self.members) - set(self._orig_members),
+			'removed':set(self._orig_members) - set(self.members)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in member_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/members" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in member_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
+
+
+		# determine member diff
+		related_diff = {
+			'new':set(self.related) - set(self._orig_related),
+			'removed':set(self._orig_related) - set(self.related)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in related_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/related" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in related_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
 
 
 
@@ -383,13 +477,6 @@ class PCDMProxyObject(_models.BasicContainer):
 
 		# update
 		self.update()
-
-
-	# def delete(self):
-
-	# 	'''
-	# 	overrides BasicContainer .delete, removing all associated resources
-	# 	'''
 
 
 

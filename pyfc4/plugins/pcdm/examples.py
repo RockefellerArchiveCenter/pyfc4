@@ -20,10 +20,32 @@ def create_pcdm_demo_resources(repo):
 	yellow = pcdm.models.PCDMObject(repo, 'yellow')
 	yellow.create(specify_uri=True)
 
-	
+	# add green and yellow to colors collection
+	colors.members.extend([green.uri, yellow.uri])
+	colors.update()
 
+	# make green and yellow related
+	green.related.append(yellow.uri)
+	green.update()
+	yellow.related.append(green.uri)
+	yellow.update()
+
+	# create spectrum binary as file for green
+	spectrum_green = _models.Binary(repo, 'green/files/spectrum_green', binary_data='540nm', binary_mimetype='text/plain')
+	spectrum_green.create(specify_uri=True)
+
+	# create loose spectrum binary, move to yellow
+	spectrum_yellow = _models.Binary(repo, 'spectrum_yellow', binary_data='570nm', binary_mimetype='text/plain')
+	spectrum_yellow.create(specify_uri=True)
+	spectrum_yellow.move(yellow.uri+'/files/spectrum_yellow')
+	yellow.update()
+	
 
 # function to delete /collections and /objects
 def delete_pcdm_demo_resources(repo):
 
-	pass
+	for uri in ['colors','green','yellow']:
+		try:
+			repo.get_resource(uri).delete(remove_tombstone=True)
+		except:
+			print('could not remove: %s' % uri)

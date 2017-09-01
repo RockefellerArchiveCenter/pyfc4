@@ -1043,6 +1043,10 @@ class Resource(object):
 			if type(updated_self) == NonRDFSource and refresh_binary:
 				self.binary.refresh(updated_self)
 
+			# fire resource._post_create hook if exists
+			if hasattr(self,'_post_refresh'):
+				self._post_refresh()
+
 			# cleanup
 			del(updated_self)
 
@@ -1637,14 +1641,14 @@ class BinaryData(object):
 		resource (NonRDFSource): instance of NonRDFSource resource
 	'''
 
-	def __init__(self, resource):
+	def __init__(self, resource, binary_data, binary_mimetype):
 		
 		# scaffold
 		self.resource = resource
 		self.delivery = None
-		self.data = None
+		self.data = binary_data
 		self.stream = False
-		self.mimetype = None
+		self.mimetype = binary_mimetype
 		self.location = None
 
 		# if resource exists, issue GET and prep for use
@@ -1834,7 +1838,7 @@ class NonRDFSource(Resource):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 	
-	def __init__(self, repo, uri=None, response=None):
+	def __init__(self, repo, uri=None, response=None, binary_data=None, binary_mimetype=None):
 
 		self.mimetype = None
 
@@ -1842,7 +1846,7 @@ class NonRDFSource(Resource):
 		super().__init__(repo, uri=uri, response=response)
 
 		# build binary data with BinaryData class instance
-		self.binary = BinaryData(self)
+		self.binary = BinaryData(self, binary_data, binary_mimetype)
 		
 
 	def fixity(self, response_format=None):
