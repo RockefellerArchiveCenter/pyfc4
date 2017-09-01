@@ -20,6 +20,8 @@ def create_pcdm_demo_resources(repo):
 	yellow = pcdm.models.PCDMObject(repo, 'yellow')
 	yellow.create(specify_uri=True)
 
+	
+
 
 # function to delete /collections and /objects
 def delete_pcdm_demo_resources(repo):

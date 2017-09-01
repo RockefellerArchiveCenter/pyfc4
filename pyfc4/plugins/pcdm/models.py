@@ -1,5 +1,7 @@
 # pyfc4 plugin: pcdm.models
 
+import copy
+
 # import pyfc4 base models
 from pyfc4 import models as _models
 
@@ -45,14 +47,15 @@ class PCDMCollection(_models.BasicContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri=None, response=None, retrieve_pcdm_links=True):
+	def __init__(self, repo, uri=None, response=None):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
 
 		# members, related
-		self.members = self.get_members(retrieve=retrieve_pcdm_links)
-		self.related = self.get_related(retrieve=retrieve_pcdm_links)
+		self.members = self.get_members()
+		self._orig_members = copy.deepcopy(self.members)
+		self.related = self.get_related()
 
 		
 	def _post_create(self):
@@ -82,6 +85,28 @@ class PCDMCollection(_models.BasicContainer):
 		related_child.create(specify_uri=True)
 
 
+	def _post_update(self):
+
+		logger.debug("firing post_update")
+
+		# determine member diff
+		member_diff = {
+			'new':set(self.members) - set(self._orig_members),
+			'removed':set(self._orig_members) - set(self.members)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in member_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/members" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in member_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
+
+
 	# def delete(self):
 
 	# 	'''
@@ -89,7 +114,7 @@ class PCDMCollection(_models.BasicContainer):
 	# 	'''
 
 
-	def get_members(self, retrieve=False):
+	def get_members(self):
 
 		'''
 		get pcdm:hasMember for this resource, optionally retrieving resource payload
@@ -99,12 +124,7 @@ class PCDMCollection(_models.BasicContainer):
 		'''
 
 		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
-			members = [ PCDMObject(self.repo, uri) for uri in self.rdf.triples.pcdm.hasMember ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for member in members:
-					member.refresh()
+			members = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasMember ]
 
 			# return
 			return members
@@ -113,7 +133,7 @@ class PCDMCollection(_models.BasicContainer):
 			return []
 
 
-	def get_related(self, retrieve=False):
+	def get_related(self):
 
 		'''
 		get ore:aggregates for this resource, optionally retrieving resource payload
@@ -123,12 +143,7 @@ class PCDMCollection(_models.BasicContainer):
 		'''
 
 		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
-			related = [ PCDMCollection(self.repo, uri) for uri in self.rdf.triples.ore.aggregates ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for resource in related:
-					resource.refresh()
+			related = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.ore.aggregates ]
 
 			# return
 			return related

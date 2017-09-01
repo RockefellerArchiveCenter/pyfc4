@@ -1383,6 +1383,10 @@ class Resource(object):
 				updated_self = self.repo.get_resource(self.uri)
 				self.binary.refresh(updated_self)
 
+		# fire optional post-update hook
+		if hasattr(self,'_post_update'):
+			self._post_update()
+
 		# determine refreshing
 		'''
 		If not updating binary, pass that bool to refresh as refresh_binary flag to avoid touching binary data
