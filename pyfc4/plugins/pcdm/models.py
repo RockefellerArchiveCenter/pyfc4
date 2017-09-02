@@ -15,13 +15,6 @@ Implementation of PCDM in LDP:
 https://docs.google.com/document/d/1RI8aX8XQEk-30-Ht-DaPF5nz_VtI1-eqxUuDvF3nhv0/edit#
 '''
 
-
-# configurations
-# TODO: https://github.com/ghukill/pyfc4/issues/76
-objects_path = 'objects'
-collections_path = 'collections'
-
-
 class PCDMCollection(_models.BasicContainer):
 
 	'''

@@ -64,7 +64,8 @@ class Repository(object):
 			password,
 			context = None,
 			default_serialization = 'application/rdf+xml',
-			default_auto_refresh=True
+			default_auto_refresh=True,
+			custom_resource_type_parser=None
 		):
 
 		# handle root path
@@ -95,6 +96,9 @@ class Repository(object):
 
 		# container for transactions
 		self.txns = {}
+
+		# optional, custom resource type parser
+		self.custom_resource_type_parser = custom_resource_type_parser
 
 
 	def parse_uri(self, uri=None):
@@ -157,9 +161,13 @@ class Repository(object):
 	def get_resource(self, uri, resource_type=None, response_format=None):
 
 		'''
-		return appropriate Resource-type instance
-			- issue HEAD request, determine Resource type (BasicContainer, DirectContainer, IndirectContainer, or NonRDFSource (Binary))
-			- issue GET request and retrieve resource metadata at uri/fcr:metadata
+		Retrieve resource:
+			- Issues an initial GET request
+			- If 200, continues, 404, returns False, otherwise raises Exception
+			- Parse resource type
+				- If custom resource type parser provided, this fires
+				- Else, or if custom parser misses, parse LDP resource type
+			- Return instantiated pyfc4 resource 
 
 		Args:
 			uri (rdflib.term.URIRef,str): input URI
@@ -177,28 +185,34 @@ class Repository(object):
 		if uri.toPython().endswith('/fcr:metadata'):
 			uri = rdflib.term.URIRef(uri.toPython().rstrip('/fcr:metadata'))
 
-		# HEAD request to detect resource type
-		head_response = self.api.http_request('HEAD', uri)
+		# fire GET request
+		get_response = self.api.http_request(
+			'GET',
+			"%s/fcr:metadata" % uri,
+			response_format=response_format)
 
 		# 404, item does not exist, return False
-		if head_response.status_code == 404:
+		if get_response.status_code == 404:
 			logger.debug('resource uri %s not found, returning False' % uri)
 			return False
 
 		# assume exists, parse headers for resource type and return instance
-		elif head_response.status_code == 200:
+		elif get_response.status_code == 200:
 
 			# if resource_type not provided
 			if not resource_type:
-				# parse LDP resource type from headers
-				resource_type = self.api.parse_resource_type(head_response)
-			logger.debug('using resource type: %s' % resource_type)
 
-			# fire GET request
-			get_response = self.api.http_request(
-				'GET',
-				"%s/fcr:metadata" % uri,
-				response_format=response_format)
+				# if custom resource type parser affixed to repo instance, fire
+				if self.custom_resource_type_parser:
+					logger.debug("custom resource type parser provided, attempting")
+					resource_type = self.custom_resource_type_parser(self, uri, get_response)
+
+				# parse LDP resource type from headers if custom resource parser misses, 
+				# or not provided
+				if not resource_type:
+					resource_type = self.api.parse_resource_type(get_response)
+
+			logger.debug('using resource type: %s' % resource_type)
 
 			# return resource
 			return resource_type(self,
@@ -206,7 +220,7 @@ class Repository(object):
 				response=get_response)
 
 		else:
-			raise Exception('HTTP %s, error retrieving resource uri %s' % (head_response.status_code, uri))
+			raise Exception('HTTP %s, error retrieving resource uri %s' % (get_response.status_code, uri))
 
 
 	def start_txn(self, txn_name=None):
