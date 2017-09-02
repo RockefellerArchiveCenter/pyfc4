@@ -166,7 +166,7 @@ class Repository(object):
 			- If 200, continues, 404, returns False, otherwise raises Exception
 			- Parse resource type
 				- If custom resource type parser provided, this fires
-				- Else, or if custom parser misses, parse LDP resource type
+				- Else, or if custom parser misses, fire HEAD request and parse LDP resource type from Link header
 			- Return instantiated pyfc4 resource 
 
 		Args:
@@ -184,6 +184,8 @@ class Repository(object):
 		# remove fcr:metadata if included, as handled below
 		if uri.toPython().endswith('/fcr:metadata'):
 			uri = rdflib.term.URIRef(uri.toPython().rstrip('/fcr:metadata'))
+
+
 
 		# fire GET request
 		get_response = self.api.http_request(
@@ -210,7 +212,9 @@ class Repository(object):
 				# parse LDP resource type from headers if custom resource parser misses, 
 				# or not provided
 				if not resource_type:
-					resource_type = self.api.parse_resource_type(get_response)
+					# Issue HEAD request to get LDP resource type from URI proper, not /fcr:metadata
+					head_response = self.api.http_request('HEAD', uri)
+					resource_type = self.api.parse_resource_type(head_response)
 
 			logger.debug('using resource type: %s' % resource_type)
 
