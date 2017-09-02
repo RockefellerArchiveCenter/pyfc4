@@ -285,11 +285,6 @@ class PCDMObject(_models.BasicContainer):
 		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
 			members = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasMember ]
 
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for member in members:
-					member.refresh()
-
 			# return
 			return members
 
@@ -308,11 +303,6 @@ class PCDMObject(_models.BasicContainer):
 
 		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasFile'):
 			files = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasFile ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for file in files:
-					file.refresh()
 
 			# return
 			return files
@@ -333,11 +323,6 @@ class PCDMObject(_models.BasicContainer):
 		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasRelatedFile'):
 			files = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasRelatedFile ]
 
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for file in files:
-					file.refresh()
-
 			# return
 			return files
 
@@ -356,11 +341,6 @@ class PCDMObject(_models.BasicContainer):
 
 		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
 			related = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.ore.aggregates ]
-
-			# if retrieve, perform retrieve through .refresh()
-			if retrieve:
-				for resource in related:
-					resource.refresh()
 
 			# return
 			return related

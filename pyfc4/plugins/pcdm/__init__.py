@@ -25,9 +25,9 @@ def custom_resource_type_parser(repo, uri, get_response):
 	logger.debug('found following rdf:types: %s' % rdf_types)
 
 	# look for pcdm:*
-	if 'http://pcdm.org/models#Collection' in rdf_types:
+	if rdflib.term.URIRef('http://pcdm.org/models#Collection') in rdf_types:
 		return models.PCDMCollection
-	elif 'http://pcdm.org/models#Object' in rdf_types:
+	elif rdflib.term.URIRef('http://pcdm.org/models#Object') in rdf_types:
 		return models.PCDMObject
 	# elif 'http://pcdm.org/models#File' in rdf_types:
 	# 	return models.PCDMFile
