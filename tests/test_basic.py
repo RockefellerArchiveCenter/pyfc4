@@ -351,7 +351,7 @@ class TestBasicRelationship(object):
 
 		# confirm triples were added
 		for val in ['windy night','stormy seas']:
-			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val, datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))) in foo.rdf.graph
+			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val)) in foo.rdf.graph
 
 
 	# set triple
@@ -373,7 +373,7 @@ class TestBasicRelationship(object):
 		foo.update()
 
 		# assert "one hit wonder"
-		assert (foo.uri, foo.rdf.prefixes.dc.title, rdflib.term.Literal('one hit wonder', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))) in foo.rdf.graph
+		assert (foo.uri, foo.rdf.prefixes.dc.title, rdflib.term.Literal('one hit wonder')) in foo.rdf.graph
 
 
 	# remove triple
@@ -387,7 +387,7 @@ class TestBasicRelationship(object):
 		foo = repo.get_resource('%s/foo' % testing_container_uri)
 
 		# remove triple
-		foo.remove_triple(foo.rdf.prefixes.dc.subject, 'stormy seas')
+		foo.remove_triple(foo.rdf.prefixes.dc.subject, rdflib.term.Literal('stormy seas'))
 		foo.update()
 
 		assert not (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal('stormy seas')) in foo.rdf.graph
@@ -656,7 +656,7 @@ class TestVersions(object):
 		# add triple
 		foo.add_triple(foo.rdf.prefixes.dc.coverage, 'forest')
 		foo.update()
-		assert foo.rdf.triples.dc.coverage[0] == rdflib.term.Literal('forest', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))
+		assert foo.rdf.triples.dc.coverage[0] == rdflib.term.Literal('forest')
 
 		# get versions and revert to foo_v1 (pre triple)
 		foo.get_versions()
