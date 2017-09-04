@@ -1,6 +1,7 @@
 # pyfc4 plugin: pcdm.models
 
 import copy
+import time
 
 # import pyfc4 base models
 from pyfc4 import models as _models

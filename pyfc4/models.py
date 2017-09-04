@@ -655,8 +655,16 @@ class SparqlUpdate(object):
 		# iterate through graphs and get unique namespace uris
 		for graph in [self.diffs.overlap, self.diffs.removed, self.diffs.added]:
 			for s,p,o in graph:
-				ns_prefix, ns_uri, predicate = graph.compute_qname(p)
-				self.update_namespaces.add(ns_uri)
+				try:
+					ns_prefix, ns_uri, predicate = graph.compute_qname(p) # predicates
+					self.update_namespaces.add(ns_uri)
+				except:
+					logger.debug('could not parse Object URI: %s' % ns_uri)
+				try:
+					ns_prefix, ns_uri, predicate = graph.compute_qname(o) # objects
+					self.update_namespaces.add(ns_uri)
+				except:
+					logger.debug('could not parse Object URI: %s' % ns_uri)
 		logger.debug(self.update_namespaces)
 
 		# build unique prefixes dictionary
@@ -851,7 +859,7 @@ class Resource(object):
 				if not serialization_format:
 					serialization_format = self.repo.default_serialization
 				data = self.rdf.graph.serialize(format=serialization_format)
-				logger.debug('Serialized graph used for resource creatoin:')
+				logger.debug('Serialized graph used for resource creation:')
 				logger.debug(data.decode('utf-8'))
 				self.headers['Content-Type'] = serialization_format
 			
@@ -1174,7 +1182,7 @@ class Resource(object):
 		and all local modifications are made to self.rdf.graph.  This method compares the two graphs and returns the diff
 		in the format of three graphs:
 
-			overlap - triples shared by both
+			overlap - triples SHARED by both
 			removed - triples that exist ONLY in the original graph, self.rdf._orig_graph
 			added - triples that exist ONLY in the modified graph, self.rdf.graph
 
