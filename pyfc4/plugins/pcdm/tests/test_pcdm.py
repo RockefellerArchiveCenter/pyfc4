@@ -112,7 +112,7 @@ class TestCRUD(object):
 		assert yellow.uri in green.related
 
 
-	def test_create_binaries(self):
+	def test_create_files(self):
 
 		# create spectrum binary as file for green in /files
 		spectrum = pcdm.models.PCDMFile(repo, '%s/green/files/spectrum' % testing_container_uri, binary_data='540nm', binary_mimetype='text/plain')
@@ -126,6 +126,22 @@ class TestCRUD(object):
 		# assert in green's files
 		green = repo.get_resource('%s/green' % testing_container_uri)
 		assert spectrum.uri in green.files
+
+
+	def test_create_associated_files(self):
+
+		# create spectrum binary as file for green in /files
+		fits = pcdm.models.PCDMFile(repo, '%s/green/associated/fits' % testing_container_uri, binary_data='some fits data', binary_mimetype='text/plain')
+		fits.create(specify_uri=True)
+		assert fits.exists
+
+		# retrieve
+		fits = repo.get_resource(fits.uri)
+		assert type(fits) == pcdm.models.PCDMFile
+
+		# assert in green's files
+		green = repo.get_resource('%s/green' % testing_container_uri)
+		assert fits.uri in green.associated
 
 
 
