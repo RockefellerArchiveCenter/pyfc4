@@ -9,6 +9,7 @@ from pyfc4.plugins import pcdm
 from tests import localsettings
 
 import pytest
+import time
 
 # logging
 import logging
@@ -19,12 +20,14 @@ logger.setLevel(logging.DEBUG)
 # target location for testing container
 testing_container_uri = 'pcdm_testing'
 
-# instantiate repository handles
+# instantiate repository handles with custom PCDM resource type parser
 repo = Repository(
 	localsettings.REPO_ROOT,
 	localsettings.REPO_USERNAME,
 	localsettings.REPO_PASSWORD,
-	context={'foo':'http://foo.com'})
+	context={'foo':'http://foo.com'},
+	default_serialization='text/turtle',
+	custom_resource_type_parser=pcdm.custom_resource_type_parser)
 
 
 ########################################################
@@ -36,14 +39,12 @@ class TestSetup(object):
 
 		# attempt delete
 		try:
-			response = repo.api.http_request('DELETE', '%s' % testing_container_uri)
+			tc = repo.get_resource(testing_container_uri)
+			tc.delete()
 		except:
-			logger.debug("uri %s not found to remove" % testing_container_uri)
-		try:
-			response = repo.api.http_request('DELETE', '%s/fcr:tombstone' % testing_container_uri)
-		except:
-			logger.debug("uri %s tombstone not found to remove" % testing_container_uri)
+			logger.debug('could not find or delete testing container')
 
+		# create testing container
 		tc = BasicContainer(repo, testing_container_uri)
 		tc.create(specify_uri=True)
 		assert tc.exists
@@ -54,84 +55,93 @@ class TestSetup(object):
 ########################################################
 class TestCRUD(object):
 
-	def test_create_pcdm_root_containers(self):
-		# overwrite pcdm defaults
-		pcdm.models.objects_path = '%s/objects' % testing_container_uri
-		pcdm.models.collections_path = '%s/collections' % testing_container_uri
-
-		# create containers for collections and objects
-		collections = BasicContainer(repo, "%s" % (pcdm.models.collections_path))
-		collections.create(specify_uri=True)
-		assert collections.exists
-		objects = BasicContainer(repo, "%s" % (pcdm.models.objects_path))
-		objects.create(specify_uri=True)
-		assert objects.exists
-
 
 	def test_create_and_retrieve_collection(self):
 
 		# create sample colors collection
-		colors = pcdm.models.PCDMCollection(repo, 'colors')
+		global colors
+		colors = pcdm.models.PCDMCollection(repo, '%s/colors' % testing_container_uri)
 		colors.create(specify_uri=True)
 		assert colors.exists
 
 		# retrieve collection
-		colors = repo.get_resource('%s/collections/colors' % testing_container_uri, resource_type=pcdm.models.PCDMCollection)
+		colors = repo.get_resource('%s/colors' % testing_container_uri)
 		assert type(colors) == pcdm.models.PCDMCollection
-
-		# make global
-		global colors
 
 
 	def test_create_and_retrieve_objects(self):
 
-		# create sample objects
-		red = colors.create_member_object('red', specify_uri=True)
-		global red
-		green = colors.create_member_object('green', specify_uri=True)
+		# create color objects
 		global green
-		blue = colors.create_member_object('blue', specify_uri=True)
-		global blue
-
-		# assert child object exists
-		assert green.exists
-
-		# retrieve and assert type
-		green = repo.get_resource('%s/objects/green' % testing_container_uri, resource_type=pcdm.models.PCDMObject)
+		green = pcdm.models.PCDMObject(repo, '%s/green' % testing_container_uri)
+		green.create(specify_uri=True)
+		green = repo.get_resource('%s/green' % testing_container_uri)
 		assert type(green) == pcdm.models.PCDMObject
 
+		global yellow
+		yellow = pcdm.models.PCDMObject(repo, '%s/yellow' % testing_container_uri)
+		yellow.create(specify_uri=True)
+		yellow = repo.get_resource('%s/yellow' % testing_container_uri)
+		assert type(yellow) == pcdm.models.PCDMObject
 
 
+	def test_add_objects_to_collection(self):
+
+		# add green and yellow to colors collection
+		colors.members.extend([green.uri, yellow.uri])
+		colors.update()
+
+		# refresh colors and confirm as members
+		colors.refresh()
+		assert green.uri in colors.members
+		assert yellow.uri in colors.members
 
 
-	# # create children to green
-	# lime = green.create_member_object('lime', specify_uri=True)
-	# chartreuse = green.create_member_object('chartreuse', specify_uri=True)
+	def test_relate_objects(self):
 
-	# # create poem for lime green
-	# poem = lime.create_file('poem', specify_uri=True, data='you\'ve always been\ngood to me lime green', mimetype='text/plain')
+		# make green and yellow related
+		green.related.append(yellow.uri)
+		green.update()
+		green.refresh()
+		yellow.related.append(green.uri)
+		yellow.update()
+		yellow.refresh()
 
-	# # create related proxy object for lime
-	# lime.create_related_proxy_object(chartreuse.uri,'chartreuse',specify_uri=True)
+		# confirm relations
+		assert green.uri in yellow.related
+		assert yellow.uri in green.related
 
-	# # create associated spectrum file for lime
-	# lime.create_associated_file('spectrum',data='570nm',mimetype='text/plain',specify_uri=True)
 
-	# # create collectoin without uri
-	# generic_collection = models.PCDMCollection(repo)
-	# generic_collection.create()
+	def test_create_files(self):
 
-	# # create generic children
-	# generic_child1 = generic_collection.create_member_object()
-	# generic_child2 = generic_collection.create_member_object()
-	# generic_child3 = generic_collection.create_member_object()
+		# create spectrum binary as file for green in /files
+		spectrum = pcdm.models.PCDMFile(repo, '%s/green/files/spectrum' % testing_container_uri, binary_data='540nm', binary_mimetype='text/plain')
+		spectrum.create(specify_uri=True)
+		assert spectrum.exists
 
-	# # create generic child to child1
-	# generic_childA = generic_child1.create_member_object()
+		# retrieve
+		spectrum = repo.get_resource(spectrum.uri)
+		assert type(spectrum) == pcdm.models.PCDMFile
 
-	# # create file for generic_childA
-	# generic_file = generic_childA.create_file(data='We\'re in Delaware.', mimetype='text/plain')
+		# assert in green's files
+		green = repo.get_resource('%s/green' % testing_container_uri)
+		assert spectrum.uri in green.files
 
+
+	def test_create_associated_files(self):
+
+		# create spectrum binary as file for green in /files
+		fits = pcdm.models.PCDMFile(repo, '%s/green/associated/fits' % testing_container_uri, binary_data='some fits data', binary_mimetype='text/plain')
+		fits.create(specify_uri=True)
+		assert fits.exists
+
+		# retrieve
+		fits = repo.get_resource(fits.uri)
+		assert type(fits) == pcdm.models.PCDMFile
+
+		# assert in green's files
+		green = repo.get_resource('%s/green' % testing_container_uri)
+		assert fits.uri in green.associated
 
 
 

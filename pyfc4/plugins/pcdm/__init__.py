@@ -29,8 +29,8 @@ def custom_resource_type_parser(repo, uri, get_response):
 		return models.PCDMCollection
 	elif rdflib.term.URIRef('http://pcdm.org/models#Object') in rdf_types:
 		return models.PCDMObject
-	# elif 'http://pcdm.org/models#File' in rdf_types:
-	# 	return models.PCDMFile
+	elif rdflib.term.URIRef('http://pcdm.org/models#File') in rdf_types:
+		return models.PCDMFile
 	else:
 		logger.debug('PCDM resource type not detected')
 		return False
