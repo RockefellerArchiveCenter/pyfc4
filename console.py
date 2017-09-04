@@ -41,6 +41,13 @@ fast_repo = Repository(
 	default_auto_refresh=False
 	)
 
+repo_pcdm = Repository(
+	REPO_ROOT,
+	REPO_USERNAME,
+	REPO_PASSWORD,
+	default_serialization='text/turtle',
+	custom_resource_type_parser=pcdm.custom_resource_type_parser)
+
 
 ################################################
 # Convenience Functions

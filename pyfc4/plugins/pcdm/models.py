@@ -1,5 +1,8 @@
 # pyfc4 plugin: pcdm.models
 
+import copy
+import time
+
 # import pyfc4 base models
 from pyfc4 import models as _models
 
@@ -12,14 +15,6 @@ logger.setLevel(logging.DEBUG)
 Implementation of PCDM in LDP:
 https://docs.google.com/document/d/1RI8aX8XQEk-30-Ht-DaPF5nz_VtI1-eqxUuDvF3nhv0/edit#
 '''
-
-
-# configurations
-# TODO: https://github.com/ghukill/pyfc4/issues/76
-objects_path = 'objects'
-collections_path = 'collections'
-
-
 
 class PCDMCollection(_models.BasicContainer):
 
@@ -46,19 +41,29 @@ class PCDMCollection(_models.BasicContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri='', response=None):
+	def __init__(self, repo, uri=None, response=None):
 
 		# fire parent Container init()
-		super().__init__(repo, uri="%s/%s" % (collections_path, uri), response=response)
+		super().__init__(repo, uri=uri, response=response)
 
+		# members, related
+		self.members = self.get_members()
+		self._orig_members = copy.deepcopy(self.members)
+		self.related = self.get_related()
+		self._orig_related = copy.deepcopy(self.related)
 
+		
 	def _post_create(self):
 
 		'''
 		resource.create() hook
 
-		For PCDM Collections, post creation, also create 
+		For PCDM Collections, post creation, also create
 		'''
+
+		# set PCDM triple as Collection
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.pcdm.Collection)
+		self.update()
 
 		# create /members child resource
 		members_child = PCDMMembersContainer(
@@ -79,42 +84,101 @@ class PCDMCollection(_models.BasicContainer):
 		related_child.create(specify_uri=True)
 
 
-	# def delete(self):
-
-	# 	'''
-	# 	overrides BasicContainer .delete, removing all associated resources
-	# 	'''
-
-
-	def create_member_object(self, uri='', specify_uri=False):
+	def get_members(self):
 
 		'''
-		create member object for this collection
-			- create PCDMObject at /objects/{obj_id}
-			- create proxy obect at /collections/{col_id}/members, with the following triples:
-				- rdf:type --> ore.Proxy
-				- ore:proxyFor --> {obj_id}.uri
-			- because /members is DirectContainer, automatically creates triple:
-				- {col_id}.uri --> pcdm.hasMember --> {obj_id}.uri
+		get pcdm:hasMember for this resource, optionally retrieving resource payload
 
 		Args:
-			uri: optional uri for child object
-			specify_uri: if True, issue PUT and specify URI, if False, issue POST and get repository minted URI
-
-		Returns:
-			PCDMObject
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		# instantiate and create PCDMObject
-		obj = PCDMObject(self.repo, uri="%s/%s" % (objects_path, uri))
-		obj.create(specify_uri=specify_uri)
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
+			members = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasMember ]
 
-		# create proxy object with proxyFor prdicate
-		proxy_obj = PCDMProxyObject(self.repo, uri="%s/members/%s" % (self.uri, uri), proxyForURI=obj.uri)
-		proxy_obj.create(specify_uri=specify_uri)
+			# return
+			return members
 
-		# return
-		return obj
+		else:
+			return []
+
+
+	def get_related(self):
+
+		'''
+		get ore:aggregates for this resource, optionally retrieving resource payload
+
+		Args:
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
+		'''
+
+		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
+			related = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.ore.aggregates ]
+
+			# return
+			return related
+
+		else:
+			return []
+
+
+	def _post_update(self):
+		
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def _post_refresh(self):
+
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def update_pcdm_relationship(self):
+
+		'''
+		'''
+
+		logger.debug("updating PCDM relationships")
+
+		# determine member diff
+		member_diff = {
+			'new':set(self.members) - set(self._orig_members),
+			'removed':set(self._orig_members) - set(self.members)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in member_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/members" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in member_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
+
+
+		# determine member diff
+		related_diff = {
+			'new':set(self.related) - set(self._orig_related),
+			'removed':set(self._orig_related) - set(self.related)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in related_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/related" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in related_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
 
 
 
@@ -149,10 +213,20 @@ class PCDMObject(_models.BasicContainer):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 
-	def __init__(self, repo, uri='', response=None):
+	def __init__(self, repo, uri=None, response=None, retrieve_pcdm_links=True):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
+
+		# members, related
+		self.members = self.get_members(retrieve=retrieve_pcdm_links)
+		self._orig_members = copy.deepcopy(self.members)
+		self.files = self.get_files(retrieve=retrieve_pcdm_links)
+		self._orig_files = copy.deepcopy(self.files)
+		self.associated = self.get_associated(retrieve=retrieve_pcdm_links)
+		self._orig_associated = copy.deepcopy(self.associated)
+		self.related = self.get_related(retrieve=retrieve_pcdm_links)
+		self._orig_related = copy.deepcopy(self.related)
 
 
 	def _post_create(self):
@@ -160,6 +234,10 @@ class PCDMObject(_models.BasicContainer):
 		'''
 		resource.create() hook
 		'''
+
+		# set PCDM triple as Object
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.pcdm.Object)
+		self.update()
 
 		# create /files child resource
 		files_child = PCDMFilesContainer(
@@ -196,121 +274,139 @@ class PCDMObject(_models.BasicContainer):
 		associated_child.create(specify_uri=True)
 
 
-	# def delete(self):
-
-	# 	'''
-	# 	overrides BasicContainer .delete, removing all associated resources
-	# 	'''
-
-
-	def create_member_object(self, uri='', specify_uri=False):
+	def get_members(self, retrieve=False):
 
 		'''
-		create member object for this object
-			- create PCDMObject at /objects/{obj_id}
-			- create proxy object at /objects/{obj_id}/members/{proxy_obj_id} with triples:
-				- rdf.type --> ore.Proxy
-				- ore.proxyFor --> {obj_id}.uri
-				- ore.proxyIn --> {parent_obj_id}.uri
-			- because /members is IndirectContainer, would create triples:
-				- {parent_obj_id}.uri --> pcdm.hasMember --> {obj_id}.uri
+		get pcdm:hasMember for this resource
 
 		Args:
-			uri: optional uri for child object
-
-		Returns:
-			PCDMObject
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		# instantiate and create PCDMObject
-		obj = PCDMObject(self.repo, uri="%s/%s" % (objects_path, uri))
-		obj.create(specify_uri=specify_uri)
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasMember'):
+			members = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasMember ]
 
-		# create proxy object with proxyFor and proxyIn predicates
-		proxy_obj = PCDMProxyObject(self.repo, uri="%s/members/%s" % (self.uri, uri), proxyForURI=obj.uri, proxyInURI=self.uri)
-		proxy_obj.create(specify_uri=specify_uri)
+			# return
+			return members
 
-		# return
-		return obj
+		else:
+			return []
 
 
-	def create_file(self, uri='', specify_uri=False, data=None, mimetype=None):
+	def get_files(self, retrieve=False):
 
 		'''
-		add file to PCDMObject
-			- create NonRDFSource at /objects/{obj_id}/files/{binary_id}
-			- because /files is DirectContainer, would create following triples:
-				- {obj_id}.uri --> pcdm.hasFile --> {binary_id}.uri
+		get pcdm:hasFile for this resource
 
 		Args:
-			uri: optional uri for child object
-			data: optional data for binary resource
-			mimetype: optional mimetype for binary resource
-
-		Returns:
-			NonRDFSource (Binary)
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		# instantiate and create PCDMBinary
-		binary = _models.Binary(self.repo, uri="%s/files/%s" % (self.uri, uri))
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasFile'):
+			files = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasFile ]
 
-		# if data and/or mimetype provided, set
-		if data:
-			binary.binary.data = data
-		if mimetype:
-			binary.binary.mimetype = mimetype
+			# return
+			return files
 
-		# create and return
-		binary.create(specify_uri=specify_uri)
-		return binary
+		else:
+			return []
 
 
-	def create_related_proxy_object(self, proxyForURI, uri='', specify_uri=False):
+	def get_associated(self, retrieve=False):
 
 		'''
-		Create related proxy object in {obj_id}.uri/related
-		Creates ore:aggregates for this object
+		get pcdm:hasRelatedFile for this resource
 
 		Args:
-			proxyForURI: required, resource that ore:proxyFor points to
-			uri: optional uri for proxy object
-			specify_uri: if True, issue PUT and create URI, if False, issue POST and get repository minted URI
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		# create proxy object with proxyFor and proxyIn predicates
-		proxy_obj = PCDMProxyObject(self.repo, uri="%s/related/%s" % (self.uri, uri), proxyForURI=proxyForURI)
-		proxy_obj.create(specify_uri=specify_uri)
+		if self.exists and hasattr(self.rdf.triples, 'pcdm') and hasattr(self.rdf.triples.pcdm, 'hasRelatedFile'):
+			files = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.pcdm.hasRelatedFile ]
+
+			# return
+			return files
+
+		else:
+			return []
 
 
-	def create_associated_file(self, uri='', specify_uri=False, data=None, mimetype=None):
+	def get_related(self, retrieve=False):
 
 		'''
-		Create Binary file at {obj_id}.uri/associated
-			- create NonRDFSource at /objects/{obj_id}/associated/{associated_binary_id}
-			- because /associated is DirectContainer, would create following triples:
-				- {obj_id}.uri --> pcdm.hasRelatedFile --> {associated_binary_id}.uri
+		get ore:aggregates for this resource
 
 		Args:
-			uri: optional uri for child object
-			data: optional data for binary resource
-			mimetype: mimetype for binary resource
-
-		Returns:
-			Binary
+			retrieve (bool): if True, issue .refresh() on resource thereby confirming existence and retrieving payload
 		'''
 
-		# instantiate and create PCDMBinary
-		binary = _models.Binary(self.repo, uri="%s/associated/%s" % (self.uri, uri))
+		if self.exists and hasattr(self.rdf.triples, 'ore') and hasattr(self.rdf.triples.ore, 'aggregates'):
+			related = [ self.repo.parse_uri(uri) for uri in self.rdf.triples.ore.aggregates ]
 
-		# if data and/or mimetype provided, set
-		if data:
-			binary.binary.data = data
-		if mimetype:
-			binary.binary.mimetype = mimetype
+			# return
+			return related
 
-		# create and return
-		binary.create(specify_uri=specify_uri)
-		return binary
+		else:
+			return []
+
+
+	def _post_update(self):
+		
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def _post_refresh(self):
+
+		'''
+		'''
+		
+		self.update_pcdm_relationship()
+
+
+	def update_pcdm_relationship(self):
+
+		'''
+		'''
+
+		logger.debug("updating PCDM relationships")
+
+		# determine member diff
+		member_diff = {
+			'new':set(self.members) - set(self._orig_members),
+			'removed':set(self._orig_members) - set(self.members)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in member_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/members" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in member_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
+
+
+		# determine member diff
+		related_diff = {
+			'new':set(self.related) - set(self._orig_related),
+			'removed':set(self._orig_related) - set(self.related)
+		}
+		logger.debug(member_diff)
+
+		# create proxy objects for added members
+		for resource_uri in related_diff['new']:
+			proxy_obj = PCDMProxyObject(self.repo, uri="%s/related" % (self.uri), proxyForURI=resource_uri)
+			proxy_obj.create()
+
+		# remove proxy objects for added members
+		for resource_uri in related_diff['removed']:
+			proxy_obj = self.repo.get_resource(resource_uri)
+			proxy_obj.delete(remove_tombstone=True)
 
 
 
@@ -327,11 +423,7 @@ class PCDMProxyObject(_models.BasicContainer):
 		proxyFor (rdflib.term.URIRef,str): URI of resource this resource is a proxy in, sets ore:proxyIn triple
 	'''
 
-	def __init__(self, repo, uri='', response=None, proxyForURI=None, proxyInURI=None):
-
-		# if full URI provided, as is the case with retrieval, derive "short" URI
-		if repo.root in uri:
-			uri = uri.split(collections_path)[-1].lstrip('/')
+	def __init__(self, repo, uri=None, response=None, proxyForURI=None, proxyInURI=None):
 
 		# fire parent Container init()
 		super().__init__(repo, uri=uri, response=response)
@@ -359,13 +451,6 @@ class PCDMProxyObject(_models.BasicContainer):
 
 		# update
 		self.update()
-
-
-	# def delete(self):
-
-	# 	'''
-	# 	overrides BasicContainer .delete, removing all associated resources
-	# 	'''
 
 
 

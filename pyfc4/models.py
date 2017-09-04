@@ -64,7 +64,8 @@ class Repository(object):
 			password,
 			context = None,
 			default_serialization = 'application/rdf+xml',
-			default_auto_refresh=True
+			default_auto_refresh=True,
+			custom_resource_type_parser=None
 		):
 
 		# handle root path
@@ -95,6 +96,9 @@ class Repository(object):
 
 		# container for transactions
 		self.txns = {}
+
+		# optional, custom resource type parser
+		self.custom_resource_type_parser = custom_resource_type_parser
 
 
 	def parse_uri(self, uri=None):
@@ -157,9 +161,13 @@ class Repository(object):
 	def get_resource(self, uri, resource_type=None, response_format=None):
 
 		'''
-		return appropriate Resource-type instance
-			- issue HEAD request, determine Resource type (BasicContainer, DirectContainer, IndirectContainer, or NonRDFSource (Binary))
-			- issue GET request and retrieve resource metadata at uri/fcr:metadata
+		Retrieve resource:
+			- Issues an initial GET request
+			- If 200, continues, 404, returns False, otherwise raises Exception
+			- Parse resource type
+				- If custom resource type parser provided, this fires
+				- Else, or if custom parser misses, fire HEAD request and parse LDP resource type from Link header
+			- Return instantiated pyfc4 resource 
 
 		Args:
 			uri (rdflib.term.URIRef,str): input URI
@@ -177,28 +185,38 @@ class Repository(object):
 		if uri.toPython().endswith('/fcr:metadata'):
 			uri = rdflib.term.URIRef(uri.toPython().rstrip('/fcr:metadata'))
 
-		# HEAD request to detect resource type
-		head_response = self.api.http_request('HEAD', uri)
+
+
+		# fire GET request
+		get_response = self.api.http_request(
+			'GET',
+			"%s/fcr:metadata" % uri,
+			response_format=response_format)
 
 		# 404, item does not exist, return False
-		if head_response.status_code == 404:
+		if get_response.status_code == 404:
 			logger.debug('resource uri %s not found, returning False' % uri)
 			return False
 
 		# assume exists, parse headers for resource type and return instance
-		elif head_response.status_code == 200:
+		elif get_response.status_code == 200:
 
 			# if resource_type not provided
 			if not resource_type:
-				# parse LDP resource type from headers
-				resource_type = self.api.parse_resource_type(head_response)
-			logger.debug('using resource type: %s' % resource_type)
 
-			# fire GET request
-			get_response = self.api.http_request(
-				'GET',
-				"%s/fcr:metadata" % uri,
-				response_format=response_format)
+				# if custom resource type parser affixed to repo instance, fire
+				if self.custom_resource_type_parser:
+					logger.debug("custom resource type parser provided, attempting")
+					resource_type = self.custom_resource_type_parser(self, uri, get_response)
+
+				# parse LDP resource type from headers if custom resource parser misses, 
+				# or not provided
+				if not resource_type:
+					# Issue HEAD request to get LDP resource type from URI proper, not /fcr:metadata
+					head_response = self.api.http_request('HEAD', uri)
+					resource_type = self.api.parse_resource_type(head_response)
+
+			logger.debug('using resource type: %s' % resource_type)
 
 			# return resource
 			return resource_type(self,
@@ -206,7 +224,7 @@ class Repository(object):
 				response=get_response)
 
 		else:
-			raise Exception('HTTP %s, error retrieving resource uri %s' % (head_response.status_code, uri))
+			raise Exception('HTTP %s, error retrieving resource uri %s' % (get_response.status_code, uri))
 
 
 	def start_txn(self, txn_name=None):
@@ -637,8 +655,16 @@ class SparqlUpdate(object):
 		# iterate through graphs and get unique namespace uris
 		for graph in [self.diffs.overlap, self.diffs.removed, self.diffs.added]:
 			for s,p,o in graph:
-				ns_prefix, ns_uri, predicate = graph.compute_qname(p)
-				self.update_namespaces.add(ns_uri)
+				try:
+					ns_prefix, ns_uri, predicate = graph.compute_qname(p) # predicates
+					self.update_namespaces.add(ns_uri)
+				except:
+					logger.debug('could not parse Object URI: %s' % ns_uri)
+				try:
+					ns_prefix, ns_uri, predicate = graph.compute_qname(o) # objects
+					self.update_namespaces.add(ns_uri)
+				except:
+					logger.debug('could not parse Object URI: %s' % ns_uri)
 		logger.debug(self.update_namespaces)
 
 		# build unique prefixes dictionary
@@ -833,7 +859,7 @@ class Resource(object):
 				if not serialization_format:
 					serialization_format = self.repo.default_serialization
 				data = self.rdf.graph.serialize(format=serialization_format)
-				logger.debug('Serialized graph used for resource creatoin:')
+				logger.debug('Serialized graph used for resource creation:')
 				logger.debug(data.decode('utf-8'))
 				self.headers['Content-Type'] = serialization_format
 			
@@ -894,8 +920,8 @@ class Resource(object):
 		else:
 			raise Exception('HTTP %s, unknown error creating resource' % response.status_code)
 
-		# if all goes well, return True
-		return True
+		# if all goes well, return self
+		return self
 
 
 	def options(self):
@@ -919,10 +945,15 @@ class Resource(object):
 
 		'''
 		Method to move resource to another location.
-		Note: by default, this leaves a tombstone.  Can use optional flag remove_tombstone to remove on successful move.
+		Note: by default, this method removes the tombstone at the resource's original URI.
+		Can use optional flag remove_tombstone to keep tombstone on successful move.
+
+		Note: other resource's triples that are managed by Fedora that point to this resource,
+		*will* point to the new URI after the move.
 
 		Args:
 			destination (rdflib.term.URIRef, str): URI location to move resource
+			remove_tombstone (bool): defaults to False, set to True to keep tombstone
 
 		Returns:
 			(Resource) new, moved instance of resource
@@ -941,7 +972,12 @@ class Resource(object):
 			# handle tombstone
 			if remove_tombstone:
 				tombstone_response = self.repo.api.http_request('DELETE', "%s/fcr:tombstone" % self.uri)
+
+			# udpdate uri, refresh, and return
+			self.uri = destination_uri
+			self.refresh()
 			return destination_uri
+
 		else:
 			raise Exception('HTTP %s, could not move resource %s to %s' % (response.status_code, self.uri, destination_uri))
 
@@ -1032,6 +1068,10 @@ class Resource(object):
 			# if NonRDF, set binary attributes
 			if type(updated_self) == NonRDFSource and refresh_binary:
 				self.binary.refresh(updated_self)
+
+			# fire resource._post_create hook if exists
+			if hasattr(self,'_post_refresh'):
+				self._post_refresh()
 
 			# cleanup
 			del(updated_self)
@@ -1142,7 +1182,7 @@ class Resource(object):
 		and all local modifications are made to self.rdf.graph.  This method compares the two graphs and returns the diff
 		in the format of three graphs:
 
-			overlap - triples shared by both
+			overlap - triples SHARED by both
 			removed - triples that exist ONLY in the original graph, self.rdf._orig_graph
 			added - triples that exist ONLY in the modified graph, self.rdf.graph
 
@@ -1373,6 +1413,10 @@ class Resource(object):
 				updated_self = self.repo.get_resource(self.uri)
 				self.binary.refresh(updated_self)
 
+		# fire optional post-update hook
+		if hasattr(self,'_post_update'):
+			self._post_update()
+
 		# determine refreshing
 		'''
 		If not updating binary, pass that bool to refresh as refresh_binary flag to avoid touching binary data
@@ -1523,6 +1567,20 @@ class Resource(object):
 			self._affix_version(version_uri, version_label)
 
 
+	def dump(self,format='ttl'):
+
+		'''
+		Convenience method to return RDF data for resource,
+		optionally selecting serialization format.
+		Inspired by .dump from Samvera.
+
+		Args:
+			format (str): expecting serialization formats accepted by rdflib.serialization(format=)
+		'''
+
+		return self.rdf.graph.serialize(format=format).decode('utf-8')
+
+
 
 # Resource Version
 class ResourceVersion(Resource):
@@ -1609,14 +1667,14 @@ class BinaryData(object):
 		resource (NonRDFSource): instance of NonRDFSource resource
 	'''
 
-	def __init__(self, resource):
+	def __init__(self, resource, binary_data, binary_mimetype):
 		
 		# scaffold
 		self.resource = resource
 		self.delivery = None
-		self.data = None
+		self.data = binary_data
 		self.stream = False
-		self.mimetype = None
+		self.mimetype = binary_mimetype
 		self.location = None
 
 		# if resource exists, issue GET and prep for use
@@ -1806,7 +1864,7 @@ class NonRDFSource(Resource):
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
 	'''
 	
-	def __init__(self, repo, uri=None, response=None):
+	def __init__(self, repo, uri=None, response=None, binary_data=None, binary_mimetype=None):
 
 		self.mimetype = None
 
@@ -1814,7 +1872,7 @@ class NonRDFSource(Resource):
 		super().__init__(repo, uri=uri, response=response)
 
 		# build binary data with BinaryData class instance
-		self.binary = BinaryData(self)
+		self.binary = BinaryData(self, binary_data, binary_mimetype)
 		
 
 	def fixity(self, response_format=None):
