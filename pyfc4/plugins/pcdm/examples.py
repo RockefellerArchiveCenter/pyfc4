@@ -31,11 +31,11 @@ def create_pcdm_demo_resources(repo):
 	yellow.update()
 
 	# create spectrum binary as file for green
-	spectrum_green = _models.Binary(repo, 'green/files/spectrum_green', binary_data='540nm', binary_mimetype='text/plain')
+	spectrum_green = pcdm.models.PCDMFile(repo, 'green/files/spectrum_green', binary_data='540nm', binary_mimetype='text/plain')
 	spectrum_green.create(specify_uri=True)
 
 	# create loose spectrum binary, move to yellow
-	spectrum_yellow = _models.Binary(repo, 'spectrum_yellow', binary_data='570nm', binary_mimetype='text/plain')
+	spectrum_yellow = pcdm.models.PCDMFile(repo, 'spectrum_yellow', binary_data='570nm', binary_mimetype='text/plain')
 	spectrum_yellow.create(specify_uri=True)
 	spectrum_yellow.move(yellow.uri+'/files/spectrum_yellow')
 	yellow.update()

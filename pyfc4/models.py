@@ -185,8 +185,6 @@ class Repository(object):
 		if uri.toPython().endswith('/fcr:metadata'):
 			uri = rdflib.term.URIRef(uri.toPython().rstrip('/fcr:metadata'))
 
-
-
 		# fire GET request
 		get_response = self.api.http_request(
 			'GET',
@@ -848,8 +846,9 @@ class Resource(object):
 			
 			logger.debug('creating resource %s with verb %s' % (self.uri, verb))
 
-			# check if NonRDFSource, if so, run self.binary._prep_binary()
-			if type(self) == NonRDFSource:
+			# check if NonRDFSource, or extension thereof
+			#if so, run self.binary._prep_binary()
+			if issubclass(type(self),NonRDFSource):
 				self.binary._prep_binary()
 				data = self.binary.data
 
@@ -1862,6 +1861,8 @@ class NonRDFSource(Resource):
 		repo (Repository): instance of Repository class
 		uri (rdflib.term.URIRef,str): input URI
 		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		binary_data: optional, file data, accepts file-like object, raw data, or URL 
+		binary_mimetype: optional, mimetype for provided data
 	'''
 	
 	def __init__(self, repo, uri=None, response=None, binary_data=None, binary_mimetype=None):

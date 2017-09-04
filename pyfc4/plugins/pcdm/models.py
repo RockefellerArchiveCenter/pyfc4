@@ -410,6 +410,42 @@ class PCDMObject(_models.BasicContainer):
 
 
 
+class PCDMFile(_models.NonRDFSource):
+
+	'''
+	Extends NonRDFSource(Binary).
+
+	Inherits:
+		NonRDFSource
+
+	Args:
+		repo (Repository): instance of Repository class
+		uri (rdflib.term.URIRef,str): input URI
+		response (requests.models.Response): defaults None, but if passed, populate self.data, self.headers, self.status_code
+		binary_data: optional, file data, accepts file-like object, raw data, or URL 
+		binary_mimetype: optional, mimetype for provided data
+	'''
+
+	def __init__(self, repo, uri=None, response=None, binary_data=None, binary_mimetype=None):
+
+		# fire parent Resource init()
+		super().__init__(repo, uri=uri, response=response, binary_data=binary_data, binary_mimetype=binary_mimetype)
+
+
+	def _post_create(self):
+
+		'''
+		resource.create() hook
+
+		For PCDM File
+		'''
+
+		# set PCDM triple as Collection
+		self.add_triple(self.rdf.prefixes.rdf.type, self.rdf.prefixes.pcdm.File)
+		self.update()
+
+
+
 class PCDMProxyObject(_models.BasicContainer):
 
 	'''
