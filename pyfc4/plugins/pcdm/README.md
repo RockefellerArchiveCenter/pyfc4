@@ -10,6 +10,13 @@ Additionally, it provides some convenience methods and patterns for observing es
 
 As a plugin, it does not influence or interfere with the basic FC4/LDP functionality of pyfc4, but only extends it.
 
+## Tests
+
+Tests can be run from the root pyfc4 directory:
+```
+$ ./pyfc4/plugins/pcdm/tests/runtests.sh
+```
+
 ## Basic Usage
 
 ### Setup custom repository handle
