@@ -31,7 +31,7 @@ repo = Repository(
 	custom_resource_type_parser=pcdm.custom_resource_type_parser)
 ```
 
-This custom parser, instead of reading the `Link` header to determine the LDP resource type, per the LDP spec, it will retrieve the resource's entire graph and parse, looking for a PCDM `rdf:type` triple.  Rough tests have shown this approach to be almost as quick, as it does not require a `HEAD` and `GET` request as the default parser does.
+This custom parser, instead of reading the `Link` header to determine the LDP resource type, per the LDP spec, will retrieve the resource's entire graph and parse, looking for a PCDM `rdf:type` triple.  Rough tests have shown this approach to be almost as quick, as it does not require a `HEAD` and `GET` request as the default parser does.
 
 ### Create PCDM Collection and Objects
 
@@ -81,6 +81,44 @@ In [13]: colors.members
 Out[13]: 
 [rdflib.term.URIRef('http://localhost:8080/fcrepo/rest/yellow'),
  rdflib.term.URIRef('http://localhost:8080/fcrepo/rest/green')]
+```
+
+We can confirm by observing the collection's entire RDF payload:
+```
+@prefix dbpedia: <http://dbpedia.org/ontology/> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix ebucore: <http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#> .
+@prefix fedora: <http://fedora.info/definitions/v4/repository#> .
+@prefix fedoraconfig: <http://fedora.info/definitions/v4/config#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix ldp: <http://www.w3.org/ns/ldp#> .
+@prefix ore: <http://www.openarchives.org/ore/terms/> .
+@prefix pcdm: <http://pcdm.org/models#> .
+@prefix premis: <http://www.loc.gov/premis/rdf/v1#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix test: <info:fedora/test/> .
+@prefix xml: <http://www.w3.org/XML/1998/namespace> .
+@prefix xmlns: <http://www.w3.org/2000/xmlns/> .
+@prefix xs: <http://www.w3.org/2001/XMLSchema> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix xsi: <http://www.w3.org/2001/XMLSchema-instance> .
+
+<http://localhost:8080/fcrepo/rest/colors> a fedora:Container,
+        fedora:Resource,
+        pcdm:Collection,
+        ldp:Container,
+        ldp:RDFSource ;
+    fedora:created "2017-09-04T15:35:42.325000+00:00"^^xsd:dateTime ;
+    fedora:createdBy "bypassAdmin" ;
+    fedora:hasParent <http://localhost:8080/fcrepo/rest/> ;
+    fedora:lastModified "2017-09-04T15:43:28.836000+00:00"^^xsd:dateTime ;
+    fedora:lastModifiedBy "bypassAdmin" ;
+    fedora:writable true ;
+    pcdm:hasMember <http://localhost:8080/fcrepo/rest/green>,
+        <http://localhost:8080/fcrepo/rest/yellow> ;
+    ldp:contains <http://localhost:8080/fcrepo/rest/colors/members>,
+        <http://localhost:8080/fcrepo/rest/colors/related> .
 ```
 
 ### Adding Binary Files
