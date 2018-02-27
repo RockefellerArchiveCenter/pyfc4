@@ -14,6 +14,10 @@ Assuming an instance of FC4 at `http://localhost:8080/rest`
   * [transactions](#transactions)
   * [versioning](#versioning)
 
+#### Import pyfc4
+```
+from pyfc4.models import *
+```
 
 #### Instantiate repository handle
 ```
