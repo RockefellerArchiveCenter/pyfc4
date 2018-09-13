@@ -14,5 +14,5 @@ setup(name='pyfc4',
       	'rdflib-jsonld',
       	'requests'
       ],
-      packages=['pyfc4'],
+      packages=['pyfc4', 'pyfc4.plugins'],
       zip_safe=False)
