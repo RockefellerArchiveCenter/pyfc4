@@ -189,11 +189,11 @@ class TestCRUD(object):
 ########################################################
 # TEARDOWN
 ########################################################
-# class TestTeardown(object):
+class TestTeardown(object):
 
-# 	def test_teardown_testing_container(self):
+	def test_teardown_testing_container(self):
 
-# 		tc = repo.get_resource(testing_container_uri)
-# 		tc.delete()
-# 		tc = repo.get_resource(testing_container_uri)
-# 		assert tc == False
+		tc = repo.get_resource(testing_container_uri)
+		tc.delete()
+		tc = repo.get_resource(testing_container_uri)
+		assert tc == False
