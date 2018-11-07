@@ -8,11 +8,11 @@ setup(name='pyfc4',
       author_email='ghukill@gmail.com',
       license='MIT License',
       install_requires=[
-      	'pytest',
-            'pytest-cov',
-      	'rdflib',
-      	'rdflib-jsonld',
-      	'requests'
+        'pytest',
+        'pytest-cov',
+        'rdflib',
+        'rdflib-jsonld',
+        'requests'
       ],
-      packages=['pyfc4'],
+      packages=['pyfc4', 'pyfc4.plugins', 'pyfc4.plugins.pcdm'],
       zip_safe=False)
