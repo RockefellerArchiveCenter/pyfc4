@@ -4,6 +4,7 @@ import copy
 import datetime
 import io
 import json
+import pdb
 import rdflib
 from rdflib.compare import to_isomorphic, graph_diff
 import rdflib_jsonld
@@ -1016,7 +1017,7 @@ class Resource(object):
 
 		Returns:
 			(bool)
-		'''
+		'''		
 
 		response = self.repo.api.http_request('DELETE', self.uri)
 
@@ -1247,9 +1248,9 @@ class Resource(object):
 		# build RDF
 		self.rdf = self._build_rdf()
 
-		# if NonRDF recreate binary data
+		# if NonRDF, empty binary data
 		if type(self) == NonRDFSource:
-			self._build_binary()
+			self.binary.empty()
 
 
 	def _handle_object(self, object_input):
@@ -1680,6 +1681,21 @@ class BinaryData(object):
 		if self.resource.exists:
 			self.parse_binary()
 
+
+	def empty(self):
+		
+		'''
+		Method to empty attributes, particularly for use when
+		object is deleted but remains as variable
+		'''
+
+		self.resource = None
+		self.delivery = None
+		self.data = None
+		self.stream = False
+		self.mimetype = None
+		self.location = None
+		
 
 	def refresh(self, updated_self):
 
