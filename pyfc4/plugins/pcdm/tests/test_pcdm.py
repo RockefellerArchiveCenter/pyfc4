@@ -82,7 +82,7 @@ class TestCRUD(object):
 		yellow = pcdm.models.PCDMObject(repo, '%s/yellow' % testing_container_uri)
 		yellow.create(specify_uri=True)
 		yellow = repo.get_resource('%s/yellow' % testing_container_uri)
-		assert type(yellow) == pcdm.models.PCDMObject
+		assert type(yellow) == pcdm.models.PCDMObject	
 
 
 	def test_add_objects_to_collection(self):
@@ -112,7 +112,7 @@ class TestCRUD(object):
 		assert yellow.uri in green.related
 
 
-	def test_create_files(self):
+	def test_create_file_plaintext(self):
 
 		# create spectrum binary as file for green in /files
 		spectrum = pcdm.models.PCDMFile(repo, '%s/green/files/spectrum' % testing_container_uri, binary_data='540nm', binary_mimetype='text/plain')
@@ -128,9 +128,49 @@ class TestCRUD(object):
 		assert spectrum.uri in green.files
 
 
-	def test_create_associated_files(self):
+	def test_create_file_fileobject(self):
 
-		# create spectrum binary as file for green in /files
+		# open README.md as file object
+		with open('pyfc4/plugins/pcdm/README.md','rb') as f:
+
+			# create readme binary as file for green in /files
+			readme = pcdm.models.PCDMFile(repo, '%s/green/files/readme' % testing_container_uri, binary_data=f, binary_mimetype='text/plain')
+			readme.create(specify_uri=True)
+			assert readme.exists
+
+		# retrieve
+		readme = repo.get_resource(readme.uri)
+		assert type(readme) == pcdm.models.PCDMFile
+
+		# assert in green's files
+		green = repo.get_resource('%s/green' % testing_container_uri)
+		assert readme.uri in green.files
+
+
+	def test_create_file_fileobject_loop(self):
+
+		for x in range(10):
+
+			# open README.md as file object
+			with open('pyfc4/plugins/pcdm/README.md','rb') as f:
+
+				# create readme binary as file for green in /files
+				readme = pcdm.models.PCDMFile(repo, '%s/green/files/readme_%s' % (testing_container_uri,x), binary_data=f, binary_mimetype='text/plain')
+				readme.create(specify_uri=True)
+				assert readme.exists
+
+			# retrieve
+			readme = repo.get_resource(readme.uri)
+			assert type(readme) == pcdm.models.PCDMFile
+
+			# assert in green's files
+			green = repo.get_resource('%s/green' % testing_container_uri)
+			assert readme.uri in green.files
+
+
+	def test_create_associated_file(self):
+
+		# create associated file
 		fits = pcdm.models.PCDMFile(repo, '%s/green/associated/fits' % testing_container_uri, binary_data='some fits data', binary_mimetype='text/plain')
 		fits.create(specify_uri=True)
 		assert fits.exists

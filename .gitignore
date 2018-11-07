@@ -99,3 +99,6 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# potential fcrepo-data
+fcrepo4-data

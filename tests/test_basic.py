@@ -6,6 +6,7 @@ from tests import localsettings
 
 import datetime
 import inspect
+import pdb
 import pytest
 import rdflib
 import time
@@ -330,6 +331,7 @@ class TestBasicRelationship(object):
 		for parent in bar.parents(as_resources=True):
 			assert Resource in inspect.getmro(parent.__class__)
 
+
 	# add triples
 	def test_add_triples(self):
 
@@ -350,8 +352,9 @@ class TestBasicRelationship(object):
 		foo.update()
 
 		# confirm triples were added
-		for val in ['windy night','stormy seas']:
-			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val)) in foo.rdf.graph
+		for val in ['windy night','stormy seas']:			
+			# assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val)) in foo.rdf.graph
+			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val, datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))) in foo.rdf.graph
 
 
 	# set triple
@@ -362,18 +365,14 @@ class TestBasicRelationship(object):
 		'''
 
 		# get foo
-		foo = repo.get_resource('%s/foo' % testing_container_uri)
-
-		# add title
-		foo.add_triple(foo.rdf.prefixes.dc.title, 'great american novel')
-		foo.update()
+		foo = repo.get_resource('%s/foo' % testing_container_uri)		
 
 		# set (modify) title
 		foo.set_triple(foo.rdf.prefixes.dc.title, 'one hit wonder')
 		foo.update()
 
 		# assert "one hit wonder"
-		assert (foo.uri, foo.rdf.prefixes.dc.title, rdflib.term.Literal('one hit wonder')) in foo.rdf.graph
+		assert (foo.uri, foo.rdf.prefixes.dc.title, rdflib.term.Literal('one hit wonder', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))) in foo.rdf.graph
 
 
 	# remove triple
@@ -656,7 +655,7 @@ class TestVersions(object):
 		# add triple
 		foo.add_triple(foo.rdf.prefixes.dc.coverage, 'forest')
 		foo.update()
-		assert foo.rdf.triples.dc.coverage[0] == rdflib.term.Literal('forest')
+		assert foo.rdf.triples.dc.coverage[0] == rdflib.term.Literal('forest', datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))
 
 		# get versions and revert to foo_v1 (pre triple)
 		foo.get_versions()

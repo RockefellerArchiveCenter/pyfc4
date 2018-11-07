@@ -14,6 +14,10 @@ Assuming an instance of FC4 at `http://localhost:8080/rest`
   * [transactions](#transactions)
   * [versioning](#versioning)
 
+#### Import pyfc4
+```
+from pyfc4.models import *
+```
 
 #### Instantiate repository handle
 ```
@@ -254,10 +258,10 @@ To add triples, pass a predicate and an object:
 
 ```
 # using built-in prefixes, and a string literal
-foo.add_triple(foo.rdf.prefixes.dc.subject, 'minty')
+foo.add_triple(foo.rdf.prefixes.dc['subject'], 'minty')
 
 # example of a foaf predicate, pointing to another resource
-foo.add_triple(foo.rdf.prefixes.foaf.knows, bar.uri)
+foo.add_triple(foo.rdf.prefixes.foaf['knows'], bar.uri)
 ```
 
 To commit these modifications to the resource's graph, use the method `.update`.  This sends the updated graph as a `PATCH` request, then retrieves the updated graph and sets that to the resource instance.
@@ -269,7 +273,7 @@ foo.update()
 Removing triples is similar to adding, passing a predicate and an object:
 
 ```
-foo.remove_triple(foo.rdf.prefixes.dc.subject, 'minty')
+foo.remove_triple(foo.rdf.prefixes.dc['subject'], 'minty')
 foo.update()
 ```
 
@@ -287,11 +291,11 @@ goober = BasicContainer(repo, 'goober')
 goober.create(specify_uri=True)
 
 # add triple using GeoNames prefix 'gn'
-goober.add_triple(goober.rdf.prefixes.gn.countryCode, 'FR')
+goober.add_triple(goober.rdf.prefixes.gn['countryCode'], 'FR')
 goober.update()
 
 # retrieve triples with gn.countryCode predicate, note that 'gn' prefix is expanded in triple creation and retrieval
-for t in goober.triples(p=goober.rdf.prefixes.gn.countryCode):
+for t in goober.triples(p=goober.rdf.prefixes.gn['countryCode']):
 	print(t)
 (rdflib.term.URIRef('http://localhost:8080/rest/goober'), rdflib.term.URIRef('http://www.geonames.org/ontology#countryCode'), rdflib.term.Literal('FR'))
 ```
@@ -315,7 +319,7 @@ Out[8]: [rdflib.term.URIRef('http://localhost:8080/rest/tronic/tronic2')]
 In [9]: foo.add_namespace('licorice','http://licorice.org#')
 
 # add triple
-In [10]: foo.add_triple(foo.rdf.prefixes.licorice.best_color, 'black')
+In [10]: foo.add_triple(foo.rdf.prefixes.licorice['best_color'], 'black')
 
 # update
 In [11]: foo.update()
