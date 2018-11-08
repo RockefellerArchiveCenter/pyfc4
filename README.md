@@ -11,8 +11,15 @@ Python client for Fedora Commons 4.
 
 ## Installation
 
+Clone this repository and install from local `master` branch:
 ```
+git clone https://github.com/ghukill/pyfc4.git
 pip install -e .
+```
+
+Install from [PYPI](https://pypi.org/project/pyfc4/):
+```
+pip install pyfc4
 ```
 
 ## Tests
