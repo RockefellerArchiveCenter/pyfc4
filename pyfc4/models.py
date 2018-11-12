@@ -864,10 +864,7 @@ class Resource(object):
 				self.headers['Content-Type'] = serialization_format
 
 			# fire creation request
-			if isinstance(data, io.BufferedIOBase):
-				response = self.repo.api.http_request(verb, self.uri, files={'file': data}, headers=self.headers, stream=stream)
-			else:
-				response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers, stream=stream)
+			response = self.repo.api.http_request(verb, self.uri, data=data, headers=self.headers, stream=stream)
 			return self._handle_create(response, ignore_tombstone, auto_refresh)
 
 
@@ -893,7 +890,7 @@ class Resource(object):
 					self.refresh()
 			# fire resource._post_create hook if exists
 			if hasattr(self,'_post_create'):
-				self._post_create()
+				self._post_create(auto_refresh=auto_refresh)
 
 		# 404, assumed POST, target location does not exist
 		elif response.status_code == 404:
@@ -1404,18 +1401,11 @@ class Resource(object):
 		if type(self) == NonRDFSource and update_binary and type(self.binary.data) != requests.models.Response:
 			self.binary._prep_binary()
 			binary_data = self.binary.data
-			if isinstance(binary_data, io.BufferedIOBase):
-				binary_response = self.repo.api.http_request(
-					'PUT',
-					self.uri,
-					files={'file': binary_data},
-					headers={'Content-Type':self.binary.mimetype})
-			else:
-				binary_response = self.repo.api.http_request(
-					'PUT',
-					self.uri,
-					data=binary_data,
-					headers={'Content-Type':self.binary.mimetype})
+			binary_response = self.repo.api.http_request(
+				'PUT',
+				self.uri,
+				data=binary_data,
+				headers={'Content-Type':self.binary.mimetype})
 
 			# if not refreshing RDF, still update binary here
 			if not auto_refresh and not self.repo.default_auto_refresh:
