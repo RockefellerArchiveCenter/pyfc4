@@ -890,7 +890,7 @@ class Resource(object):
 					self.refresh()
 			# fire resource._post_create hook if exists
 			if hasattr(self,'_post_create'):
-				self._post_create()
+				self._post_create(auto_refresh=auto_refresh)
 
 		# 404, assumed POST, target location does not exist
 		elif response.status_code == 404:
