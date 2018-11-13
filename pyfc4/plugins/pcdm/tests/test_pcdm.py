@@ -27,7 +27,8 @@ repo = Repository(
 	localsettings.REPO_PASSWORD,
 	context={'foo':'http://foo.com'},
 	default_serialization='text/turtle',
-	custom_resource_type_parser=pcdm.custom_resource_type_parser)
+	custom_resource_type_parser=pcdm.custom_resource_type_parser,
+	default_auto_refresh=True)
 
 
 ########################################################
