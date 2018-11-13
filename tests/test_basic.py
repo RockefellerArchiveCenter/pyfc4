@@ -549,6 +549,7 @@ class TestTransactions(object):
 		# create bc in zing
 		zingfoo = BasicContainer(zing, '%s/zingfoo' % testing_container_uri)
 		zingfoo.create(specify_uri=True)
+		zingfoo.refresh()
 		assert zingfoo.exists
 
 		# commit zing and test for commit of zingfoo
@@ -564,6 +565,7 @@ class TestTransactions(object):
 		# create zingfoo2 in txn
 		zingfoo2 = BasicContainer(txn, '%s/zingfoo2' % testing_container_uri)
 		zingfoo2.create(specify_uri=True)
+		zingfoo2.refresh()
 		assert zingfoo2.exists
 
 		# but, rollback and confirm not committed
