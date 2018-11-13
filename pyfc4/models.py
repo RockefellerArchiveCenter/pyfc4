@@ -821,7 +821,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, auto_refresh=False):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, auto_refresh=None):
 
 		'''
 		Primary method to create resources.
@@ -886,7 +886,7 @@ class Resource(object):
 			# creation successful
 			if auto_refresh:
 				self.refresh()
-			elif auto_refresh == False:
+			elif auto_refresh == None:
 				if self.repo.default_auto_refresh:
 					self.refresh()
 			# fire resource._post_create hook if exists
@@ -1358,12 +1358,12 @@ class Resource(object):
 			self.parse_object_like_triples()
 
 		# else, if auto_refresh is not set (None), check repository instance default
-		elif auto_refresh == False:
+		elif auto_refresh == None:
 			if self.repo.default_auto_refresh:
 				self.parse_object_like_triples()
 
 
-	def update(self, sparql_query_only=False, auto_refresh=False, update_binary=True):
+	def update(self, sparql_query_only=False, auto_refresh=None, update_binary=True):
 
 		'''
 		Method to update resources in repository.  Firing this method computes the difference in the local modified graph and the original one,
@@ -1424,7 +1424,7 @@ class Resource(object):
 		'''
 		if auto_refresh:
 			self.refresh(refresh_binary=update_binary)
-		elif auto_refresh == False:
+		elif auto_refresh == None:
 			if self.repo.default_auto_refresh:
 				self.refresh(refresh_binary=update_binary)
 		return True

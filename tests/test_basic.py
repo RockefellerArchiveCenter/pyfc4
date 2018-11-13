@@ -29,15 +29,15 @@ repo = Repository(
 	localsettings.REPO_ROOT,
 	localsettings.REPO_USERNAME,
 	localsettings.REPO_PASSWORD,
-	context={'foo':'http://foo.com'})
+	context={'foo':'http://foo.com'},
+	default_auto_refresh=True)
 
 # more performant, defaults to not refresh
 fast_repo = Repository(
 	localsettings.REPO_ROOT,
 	localsettings.REPO_USERNAME,
 	localsettings.REPO_PASSWORD,
-	default_auto_refresh=False
-	)
+	default_auto_refresh=False)
 
 
 
