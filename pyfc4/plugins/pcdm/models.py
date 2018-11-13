@@ -53,7 +53,7 @@ class PCDMCollection(_models.BasicContainer):
 		self._orig_related = copy.deepcopy(self.related)
 
 
-	def _post_create(self, auto_refresh=None):
+	def _post_create(self, auto_refresh=False):
 
 		'''
 		resource.create() hook
@@ -229,7 +229,7 @@ class PCDMObject(_models.BasicContainer):
 		self._orig_related = copy.deepcopy(self.related)
 
 
-	def _post_create(self, auto_refresh=None):
+	def _post_create(self, auto_refresh=False):
 
 		'''
 		resource.create() hook
@@ -432,7 +432,7 @@ class PCDMFile(_models.NonRDFSource):
 		super().__init__(repo, uri=uri, response=response, binary_data=binary_data, binary_mimetype=binary_mimetype)
 
 
-	def _post_create(self, auto_refresh=None):
+	def _post_create(self, auto_refresh=False):
 
 		'''
 		resource.create() hook
@@ -468,7 +468,7 @@ class PCDMProxyObject(_models.BasicContainer):
 		self.proxyInURI = proxyInURI
 
 
-	def _post_create(self, auto_refresh=None):
+	def _post_create(self, auto_refresh=False):
 
 		'''
 		resource.create() hook

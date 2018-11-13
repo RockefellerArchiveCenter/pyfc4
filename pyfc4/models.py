@@ -65,8 +65,8 @@ class Repository(object):
 			password,
 			context = None,
 			default_serialization = 'application/rdf+xml',
-			default_auto_refresh=True,
-			custom_resource_type_parser=None
+			default_auto_refresh = True,
+			custom_resource_type_parser = None
 		):
 
 		# handle root path
@@ -821,7 +821,7 @@ class Resource(object):
 		return self.exists
 
 
-	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, auto_refresh=None):
+	def create(self, specify_uri=False, ignore_tombstone=False, serialization_format=None, stream=False, auto_refresh=False):
 
 		'''
 		Primary method to create resources.
@@ -830,6 +830,7 @@ class Resource(object):
 			specify_uri (bool): If True, uses PUT verb and sets the URI during creation.  If False, uses POST and gets repository minted URI
 			ignore_tombstone (bool): If True, will attempt creation, if tombstone exists (409), will delete tombstone and retry
 			serialization_format(str): Content-Type header / mimetype that will be used to serialize self.rdf.graph, and set headers for PUT/POST requests
+			auto_refresh (bool): If True, refreshes resource after update. If left None, defaults to repo.default_auto_refresh
 		'''
 
 		# if resource claims existence, raise exception
@@ -885,7 +886,7 @@ class Resource(object):
 			# creation successful
 			if auto_refresh:
 				self.refresh()
-			elif auto_refresh == None:
+			elif auto_refresh == False:
 				if self.repo.default_auto_refresh:
 					self.refresh()
 			# fire resource._post_create hook if exists
@@ -1286,7 +1287,7 @@ class Resource(object):
 			return object_input
 
 
-	def add_triple(self, p, o, auto_refresh=None):
+	def add_triple(self, p, o, auto_refresh=False):
 
 		'''
 		add triple by providing p,o, assumes s = subject
@@ -1357,12 +1358,12 @@ class Resource(object):
 			self.parse_object_like_triples()
 
 		# else, if auto_refresh is not set (None), check repository instance default
-		elif auto_refresh == None:
+		elif auto_refresh == False:
 			if self.repo.default_auto_refresh:
 				self.parse_object_like_triples()
 
 
-	def update(self, sparql_query_only=False, auto_refresh=None, update_binary=True):
+	def update(self, sparql_query_only=False, auto_refresh=False, update_binary=True):
 
 		'''
 		Method to update resources in repository.  Firing this method computes the difference in the local modified graph and the original one,
@@ -1423,7 +1424,7 @@ class Resource(object):
 		'''
 		if auto_refresh:
 			self.refresh(refresh_binary=update_binary)
-		elif auto_refresh == None:
+		elif auto_refresh == False:
 			if self.repo.default_auto_refresh:
 				self.refresh(refresh_binary=update_binary)
 		return True
