@@ -65,7 +65,7 @@ class Repository(object):
 			password,
 			context = None,
 			default_serialization = 'application/rdf+xml',
-			default_auto_refresh = True,
+			default_auto_refresh = False,
 			custom_resource_type_parser = None
 		):
 
@@ -1287,7 +1287,7 @@ class Resource(object):
 			return object_input
 
 
-	def add_triple(self, p, o, auto_refresh=False):
+	def add_triple(self, p, o, auto_refresh=True):
 
 		'''
 		add triple by providing p,o, assumes s = subject
