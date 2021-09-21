@@ -1,5 +1,2 @@
-pytest
-pytest-cov
-rdflib
-rdflib-jsonld
-requests
+rdflib>6,<7
+requests<3

@@ -11,7 +11,6 @@ setup(name='pyfc4',
         'pytest',
         'pytest-cov',
         'rdflib',
-        'rdflib-jsonld',
         'requests'
       ],
       packages=['pyfc4', 'pyfc4.plugins', 'pyfc4.plugins.pcdm'],
