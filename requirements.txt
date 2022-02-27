@@ -1,5 +1,4 @@
 pytest
 pytest-cov
-rdflib
-rdflib-jsonld
-requests
+rdflib < 7.0 >= 6.1.1
+requests < 3.0 > 2.27.0
