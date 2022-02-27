@@ -7,7 +7,6 @@ import json
 import pdb
 import rdflib
 from rdflib.compare import to_isomorphic, graph_diff
-import rdflib_jsonld
 import requests
 import time
 from types import SimpleNamespace
@@ -608,7 +607,7 @@ class API(object):
 
 		# parse graph
 		graph = rdflib.Graph().parse(
-			data=data.decode('utf-8'),
+			data=data,
 			format=parse_format)
 
 		# return graph
@@ -705,11 +704,11 @@ class SparqlUpdate(object):
 			sparql_query += "PREFIX %s: <%s>\n" % (ns_prefix, str(ns_uri))
 
 		# deletes
-		removed_serialized = self.diffs.removed.serialize(format='nt').decode('utf-8')
+		removed_serialized = self.diffs.removed.serialize(format='nt')
 		sparql_query += '\nDELETE {\n%s}\n\n' % removed_serialized
 
 		# inserts
-		added_serialized = self.diffs.added.serialize(format='nt').decode('utf-8')
+		added_serialized = self.diffs.added.serialize(format='nt')
 		sparql_query += '\nINSERT {\n%s}\n\n' % added_serialized
 
 		# where (not yet implemented)
@@ -861,7 +860,7 @@ class Resource(object):
 					serialization_format = self.repo.default_serialization
 				data = self.rdf.graph.serialize(format=serialization_format)
 				logger.debug('Serialized graph used for resource creation:')
-				logger.debug(data.decode('utf-8'))
+				logger.debug(data)
 				self.headers['Content-Type'] = serialization_format
 
 			# fire creation request
@@ -1579,7 +1578,7 @@ class Resource(object):
 			format (str): expecting serialization formats accepted by rdflib.serialization(format=)
 		'''
 
-		return self.rdf.graph.serialize(format=format).decode('utf-8')
+		return self.rdf.graph.serialize(format=format)
 
 
 
