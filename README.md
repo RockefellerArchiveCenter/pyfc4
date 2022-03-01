@@ -6,7 +6,7 @@ Python client for Fedora Commons 4.
 
 ## Requirements
 
-  * Python 3.5+
+  * Python 3.7 - 3.10
   * [Fedora Commons 4.7+]((http://fedorarepository.org/))
 
 ## Installation

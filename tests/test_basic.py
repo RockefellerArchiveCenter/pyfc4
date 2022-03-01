@@ -86,11 +86,10 @@ class TestBasicCRUDPUT(object):
 	# test bad uri
 	def test_bad_uri(self):
 
-		with pytest.raises(Exception) as excinfo:
-			repo.get_resource('*%($')
-		assert 'error retrieving resource' in str(excinfo.value)	
+		result = repo.get_resource('*%($')
+		assert result == False
 
-	
+
 	# create foo (basic container)
 	def test_create_bc(self):
 
@@ -254,7 +253,7 @@ class TestBinaryUpload(object):
 
 	# upload file-like object
 	def test_file_like_object(self):
-		
+
 		baz1 = Binary(repo, '%s/foo/baz1' % testing_container_uri)
 		baz1.binary.data = open('README.md','rb')
 		baz1.binary.mimetype = 'text/plain'
@@ -352,7 +351,7 @@ class TestBasicRelationship(object):
 		foo.update()
 
 		# confirm triples were added
-		for val in ['windy night','stormy seas']:			
+		for val in ['windy night','stormy seas']:
 			# assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val)) in foo.rdf.graph
 			assert (foo.uri, foo.rdf.prefixes.dc.subject, rdflib.term.Literal(val, datatype=rdflib.term.URIRef('http://www.w3.org/2001/XMLSchema#string'))) in foo.rdf.graph
 
@@ -365,7 +364,7 @@ class TestBasicRelationship(object):
 		'''
 
 		# get foo
-		foo = repo.get_resource('%s/foo' % testing_container_uri)		
+		foo = repo.get_resource('%s/foo' % testing_container_uri)
 
 		# set (modify) title
 		foo.set_triple(foo.rdf.prefixes.dc.title, 'one hit wonder')
@@ -674,7 +673,7 @@ class TestVersions(object):
 
 		# create versions and confirm exists
 		v1 = baz.create_version('v1')
-		assert type(baz.versions.v1) == ResourceVersion	
+		assert type(baz.versions.v1) == ResourceVersion
 
 
 # fixity
@@ -770,4 +769,3 @@ class TestTeardown(object):
 		tc.delete()
 		tc = repo.get_resource(testing_container_uri)
 		assert tc == False
-

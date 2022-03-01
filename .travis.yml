@@ -1,12 +1,5 @@
+dist: bionic
 language: python
-# blocklist
-branches:
-  except:
-  - dev
-# safelist
-branches:
-  only:
-  - master
 sudo: required
 services:
   - docker
@@ -16,7 +9,10 @@ before_install:
   - echo "import time; time.sleep(20)" | python
   - cp tests/localsettings.py.template tests/localsettings.py
 python:
-  - "3.5"
+  - "3.7"
+  - "3.8"
+  - "3.9"
+  - "3.10"
 # command to install dependencies
 install: "pip3 install -e ."
 # command to run tests
