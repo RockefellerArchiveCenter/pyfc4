@@ -1,3 +1,5 @@
+**This library has been marked as read-only and is no longer actively maintained or supported.**
+
 # pyfc4
 
 ![Travis Build](https://travis-ci.org/ghukill/pyfc4.svg?branch=master "Travis Build")
